@@ -1,6 +1,6 @@
-flask==3.0.0
-werkzeug==3.0.1
-python-dateutil==2.8.2
-gunicorn==21.2.0
-Pillow==10.2.0
-pytesseract==0.3.10
+flask
+werkzeug
+python-dateutil
+gunicorn
+Pillow
+pytesseract
