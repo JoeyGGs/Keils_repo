@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Order Sheet - {{ vendor.name }} - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="order-sheet-page">
+    <div class="page-header">
+        <div>
+            <h2>Order Sheet: {{ vendor.name }}</h2>
+            <p>Generated: {{ order.generated_date.strftime('%B %d, %Y at %I:%M %p') }}</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('orders') }}" class="btn btn-outline">← Back to Orders</a>
+            <a href="{{ url_for('print_order', vendor_id=vendor.id) }}" class="btn btn-primary" target="_blank">🖨️ Print Order</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Vendor Information</h3>
+        </div>
+        <div class="card-body vendor-info-grid">
+            <div>
+                <p><strong>Company:</strong> {{ vendor.name }}</p>
+                <p><strong>Contact:</strong> {{ vendor.contact_name or 'N/A' }}</p>
+            </div>
+            <div>
+                <p><strong>Phone:</strong> {{ vendor.phone or 'N/A' }}</p>
+                <p><strong>Email:</strong> {{ vendor.email or 'N/A' }}</p>
+            </div>
+            <div>
+                <p><strong>Categories:</strong> {{ vendor.categories|join(', ') }}</p>
+                <p><strong>Notes:</strong> {{ vendor.notes or 'None' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Order Items</h3>
+        </div>
+        <div class="card-body">
+            {% if order.items %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Current Stock</th>
+                        <th>Min Qty</th>
+                        <th>Suggested Order</th>
+                        <th>Unit</th>
+                        <th>Est. Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item_data in order.items %}
+                    <tr>
+                        <td><strong>{{ item_data.item.name }}</strong></td>
+                        <td>{{ item_data.item.category.value }}</td>
+                        <td class="text-danger">{{ "%.1f"|format(item_data.item.quantity) }}</td>
+                        <td>{{ "%.1f"|format(item_data.item.min_quantity) }}</td>
+                        <td>{{ "%.1f"|format(item_data.suggested_quantity) }}</td>
+                        <td>{{ item_data.item.unit }}</td>
+                        <td>${{ "%.2f"|format(item_data.estimated_cost) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="6" class="text-right"><strong>Estimated Total:</strong></td>
+                        <td><strong>${{ "%.2f"|format(order.total_estimated_cost) }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+            {% else %}
+            <p class="empty-state">No items to order from this vendor.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="schedule-page">
+    <div class="page-header">
+        <h2>Weekly Schedule</h2>
+        <div class="week-nav">
+            <a href="{{ url_for('schedule', week=week_offset-1) }}" class="btn btn-sm">&larr; Previous</a>
+            <span class="week-label">{{ week_start.strftime('%m/%d') }} - {{ week_end.strftime('%m/%d/%Y') }}</span>
+            <a href="{{ url_for('schedule', week=week_offset+1) }}" class="btn btn-sm">Next &rarr;</a>
+            {% if week_offset != 0 %}
+            <a href="{{ url_for('schedule') }}" class="btn btn-sm btn-outline">Current</a>
+            {% endif %}
+        </div>
+        <div class="schedule-actions">
+            <button onclick="openOCRModal()" class="btn btn-info">📷 Scan Schedule</button>
+            <button onclick="openNewScheduleModal()" class="btn btn-success">+ New Schedule</button>
+            <button onclick="window.print()" class="btn btn-primary">🖨️ Print</button>
+        </div>
+    </div>
+
+    <div class="card" id="printable-schedule">
+        <div class="print-header">
+            <h2>Keil's Service Deli - Weekly Schedule</h2>
+            <p>{{ week_start.strftime('%m/%d/%Y') }} - {{ week_end.strftime('%m/%d/%Y') }}</p>
+        </div>
+        <div class="card-body schedule-table-container">
+            <table class="schedule-table">
+                    <tr>
+                        <th class="name-col">Name</th>
+                        {% for day in days %}
+                        <th class="day-col {% if day.date == today %}today-col{% endif %}">
+                            <div class="day-name">{{ day.name[:3].upper() }}</div>
+                            <div class="day-date">{{ day.date.strftime('%m/%d') }}</div>
+                        </th>
+                        {% endfor %}
+                        <th class="totals-col">TOTALS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in schedule_data %}
+                    <tr>
+                        <td class="name-col">{{ emp.name }}</td>
+                        {% for day_shift in emp.shifts %}
+                        <td class="shift-cell {% if day_shift.is_today %}today-col{% endif %} {% if day_shift.display == 'OFF' %}off-cell{% elif day_shift.display == 'R/O' %}ro-cell{% elif day_shift.display %}shift-filled{% endif %}"
+                            onclick="openEditShift('{{ emp.id }}', '{{ emp.name }}', '{{ day_shift.date }}', '{{ day_shift.display }}', '{{ day_shift.shift_id }}')"
+                            title="Click to edit">
+                            {{ day_shift.display }}
+                        </td>
+                        {% endfor %}
+                        <td class="totals-col">{{ emp.total_hours|int }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="schedule-legend no-print">
+        <h4>Shift Types:</h4>
+        <span class="legend-item"><strong>Opening/BAR</strong> - 5AM-1:30PM</span>
+        <span class="legend-item"><strong>MID</strong> - 9:30AM-6PM</span>
+        <span class="legend-item"><strong>PM</strong> - 12PM-8:30PM</span>
+        <span class="legend-item"><strong>Closing</strong> - 1PM-9:30PM</span>
+        <span class="legend-item"><strong>R/O</strong> - Request Off</span>
+        <span class="legend-item"><strong>OFF</strong> - Day Off</span>
+    </div>
+</div>
+
+<!-- Edit Shift Modal -->
+<div id="editShiftModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Shift</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('update_shift') }}" id="editShiftForm">
+            <div class="modal-body">
+                <input type="hidden" name="employee_id" id="edit-emp-id">
+                <input type="hidden" name="employee_name" id="edit-emp-name">
+                <input type="hidden" name="date" id="edit-date">
+                <input type="hidden" name="old_shift_id" id="edit-old-shift-id">
+                <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                
+                <p><strong id="edit-title"></strong></p>
+                
+                <div class="form-group">
+                    <label>Shift Type</label>
+                    <select name="shift_type" id="edit-shift-type" onchange="toggleShiftFields()">
+                        <option value="preset">-- Quick Select --</option>
+                        <option value="opening">Opening / Salad Bar (5AM-1:30PM)</option>
+                        <option value="mid">Mid-Day (9:30AM-6PM)</option>
+                        <option value="pm">PM (12PM-8:30PM)</option>
+                        <option value="closing">Closing (1PM-9:30PM)</option>
+                        <option value="off">OFF (Day Off)</option>
+                        <option value="ro">R/O (Request Off)</option>
+                        <option value="custom">Custom Time</option>
+                        <option value="clear">Clear / No Shift</option>
+                    </select>
+                </div>
+
+                <div id="custom-shift-fields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Time</label>
+                            <input type="time" name="start_time" id="edit-start-time">
+                        </div>
+                        <div class="form-group">
+                            <label>End Time</label>
+                            <input type="time" name="end_time" id="edit-end-time">
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="station-field">
+                    <div class="form-group">
+                        <label>Station (Optional)</label>
+                        <select name="station" id="edit-station">
+                            <option value="">None</option>
+                            <option value="BAR">BAR - Salad Bar</option>
+                            <option value="MID">MID - Mid</option>
+                            <option value="OP">OP - Open</option>
+                            <option value="CK">CK - Cook</option>
+                            <option value="FR">FR - Fryer</option>
+                            <option value="MEAT">MEAT - Meat</option>
+                            <option value="PM">PM - PM Shift</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- New Schedule Modal -->
+<div id="newScheduleModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Create New Schedule</h3>
+            <button class="modal-close" onclick="closeNewScheduleModal()">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('create_new_schedule') }}" id="newScheduleForm">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Week (Monday)</label>
+                        <input type="date" name="start_date" id="new-start-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Weeks</label>
+                        <select name="num_weeks" id="new-num-weeks">
+                            <option value="1">1 Week</option>
+                            <option value="2">2 Weeks</option>
+                            <option value="4" selected>4 Weeks</option>
+                            <option value="8">8 Weeks</option>
+                            <option value="12">12 Weeks</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="copy_current" id="copy-current" checked>
+                        Copy current week's schedule as template (repeats each week)
+                    </label>
+                </div>
+
+                <div id="template-preview" class="template-preview">
+                    <h4>Template Preview (Current Week)</h4>
+                    <p class="help-text">This schedule will repeat for each selected week:</p>
+                    <table class="preview-table">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>MON</th>
+                                <th>TUE</th>
+                                <th>WED</th>
+                                <th>THU</th>
+                                <th>FRI</th>
+                                <th>SAT</th>
+                                <th>SUN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for emp in schedule_data %}
+                            <tr>
+                                <td>{{ emp.name }}</td>
+                                {% for day_shift in emp.shifts %}
+                                <td class="{% if day_shift.display == 'OFF' %}off-cell{% elif day_shift.display == 'R/O' %}ro-cell{% elif day_shift.display %}shift-filled{% endif %}">
+                                    {{ day_shift.display or '-' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Note:</strong> Creating a new schedule will overwrite any existing shifts in the selected date range.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeNewScheduleModal()">Cancel</button>
+                <button type="submit" class="btn btn-success">Create Schedule</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- OCR Upload Modal -->
+<div id="ocrModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📷 Scan Schedule Image</h3>
+            <button class="modal-close" onclick="closeOCRModal()">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('schedule_ocr') }}" enctype="multipart/form-data" id="ocrForm">
+            <div class="modal-body">
+                <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                
+                <div class="ocr-info">
+                    <p>Upload a photo of a schedule to automatically extract shifts using OCR (Optical Character Recognition).</p>
+                    <p class="help-text">For best results:</p>
+                    <ul class="help-list">
+                        <li>Use a clear, well-lit photo</li>
+                        <li>Ensure the schedule is flat and not tilted</li>
+                        <li>Include employee names and shift times</li>
+                        <li>Crop to show just the schedule table</li>
+                    </ul>
+                </div>
+                
+                <div class="form-group">
+                    <label>Select Schedule Image</label>
+                    <input type="file" name="schedule_image" id="schedule-image" accept="image/*" capture="environment" required>
+                </div>
+                
+                <div id="image-preview" class="image-preview" style="display:none;">
+                    <img id="preview-img" src="" alt="Preview">
+                </div>
+                
+                <div class="target-week">
+                    <p><strong>Target Week:</strong> {{ week_start.strftime('%m/%d/%Y') }} - {{ week_end.strftime('%m/%d/%Y') }}</p>
+                    <p class="help-text">Shifts will be imported to this week. Navigate to a different week before scanning if needed.</p>
+                </div>
+                
+                <div class="warning-box">
+                    <strong>⚠️ Note:</strong> This will replace all existing shifts for the selected week.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeOCRModal()">Cancel</button>
+                <button type="submit" class="btn btn-info" id="ocr-submit">
+                    <span class="btn-text">📷 Scan & Import</span>
+                    <span class="btn-loading" style="display:none;">Processing...</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.schedule-page .page-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.schedule-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+.schedule-table-container {
+    overflow-x: auto;
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.schedule-table th,
+.schedule-table td {
+    border: 1px solid #d1d5db;
+    padding: 8px 6px;
+    text-align: center;
+}
+
+.schedule-table th {
+    background: #1f2937;
+    color: white;
+    font-weight: 600;
+}
+
+.name-col {
+    text-align: left !important;
+    font-weight: 600;
+    min-width: 100px;
+    background: #f3f4f6;
+}
+
+.day-col {
+    min-width: 90px;
+}
+
+.day-name {
+    font-weight: 700;
+}
+
+.day-date {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.totals-col {
+    background: #f3f4f6;
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.today-col {
+    background: #dbeafe !important;
+}
+
+.shift-cell {
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.85rem;
+}
+
+.shift-cell:hover {
+    background: #e5e7eb;
+}
+
+.off-cell {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ro-cell {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.shift-filled {
+    background: #d1fae5;
+}
+
+.schedule-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.schedule-table tbody tr:hover {
+    background: #f3f4f6;
+}
+
+.schedule-table tfoot td {
+    background: #e5e7eb;
+    font-weight: 600;
+}
+
+.schedule-legend {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f3f4f6;
+    border-radius: 8px;
+}
+
+.schedule-legend h4 {
+    margin-bottom: 10px;
+}
+
+.legend-item {
+    display: inline-block;
+    margin-right: 20px;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+}
+
+.modal-large {
+    max-width: 900px;
+}
+
+.template-preview {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.template-preview h4 {
+    margin-bottom: 5px;
+}
+
+.help-text {
+    color: #6b7280;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.preview-table th,
+.preview-table td {
+    border: 1px solid #d1d5db;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.preview-table th {
+    background: #374151;
+    color: white;
+}
+
+.warning-box {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 15px;
+    color: #92400e;
+}
+
+/* OCR Styles */
+.btn-info {
+    background: #0ea5e9;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #0284c7;
+}
+
+.ocr-info {
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.ocr-info p {
+    margin-bottom: 10px;
+}
+
+.help-list {
+    margin: 10px 0 0 20px;
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.help-list li {
+    margin-bottom: 5px;
+}
+
+.image-preview {
+    margin: 15px 0;
+    text-align: center;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 4px;
+}
+
+.target-week {
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 15px 0;
+}
+
+.target-week p {
+    margin: 0;
+}
+
+input[type="file"] {
+    padding: 10px;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    width: 100%;
+    cursor: pointer;
+}
+
+input[type="file"]:hover {
+    border-color: #0ea5e9;
+}
+
+/* Print Styles */
+.print-header {
+    display: none;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    
+    #printable-schedule, #printable-schedule * {
+        visibility: visible;
+    }
+    
+    #printable-schedule {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    
+    .print-header {
+        display: block !important;
+    }
+    
+    .no-print {
+        display: none !important;
+    }
+    
+    .shift-cell {
+        cursor: default;
+    }
+    
+    .schedule-table {
+        font-size: 11pt;
+    }
+    
+    .schedule-table th,
+    .schedule-table td {
+        padding: 6px 4px;
+    }
+    
+    @page {
+        size: landscape;
+        margin: 0.5in;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Preset shift times
+const SHIFT_PRESETS = {
+    'opening': { start: '05:00', end: '13:30', station: 'BAR' },
+    'mid': { start: '09:30', end: '18:00', station: 'MID' },
+    'pm': { start: '12:00', end: '20:30', station: 'PM' },
+    'closing': { start: '13:00', end: '21:30', station: '' }
+};
+
+function openEditShift(empId, empName, date, currentShift, shiftId) {
+    document.getElementById('edit-emp-id').value = empId;
+    document.getElementById('edit-emp-name').value = empName;
+    document.getElementById('edit-date').value = date;
+    document.getElementById('edit-old-shift-id').value = shiftId || '';
+    document.getElementById('edit-title').textContent = empName + ' - ' + date;
+    
+    // Reset form
+    document.getElementById('edit-shift-type').value = 'preset';
+    document.getElementById('edit-start-time').value = '';
+    document.getElementById('edit-end-time').value = '';
+    document.getElementById('edit-station').value = '';
+    
+    // Set current values based on existing shift
+    if (currentShift === 'OFF') {
+        document.getElementById('edit-shift-type').value = 'off';
+    } else if (currentShift === 'R/O') {
+        document.getElementById('edit-shift-type').value = 'ro';
+    } else if (!currentShift) {
+        document.getElementById('edit-shift-type').value = 'clear';
+    }
+    
+    toggleShiftFields();
+    document.getElementById('editShiftModal').classList.add('active');
+}
+
+function toggleShiftFields() {
+    const shiftType = document.getElementById('edit-shift-type').value;
+    const customFields = document.getElementById('custom-shift-fields');
+    const stationField = document.getElementById('station-field');
+    
+    // Handle preset shifts
+    if (SHIFT_PRESETS[shiftType]) {
+        const preset = SHIFT_PRESETS[shiftType];
+        document.getElementById('edit-start-time').value = preset.start;
+        document.getElementById('edit-end-time').value = preset.end;
+        document.getElementById('edit-station').value = preset.station;
+        customFields.style.display = 'none';
+        stationField.style.display = 'block';
+    } else if (shiftType === 'custom') {
+        customFields.style.display = 'block';
+        stationField.style.display = 'block';
+    } else {
+        // off, ro, clear
+        customFields.style.display = 'none';
+        stationField.style.display = 'none';
+    }
+}
+
+function closeModal() {
+    document.getElementById('editShiftModal').classList.remove('active');
+}
+
+function openNewScheduleModal() {
+    // Set default date to next Monday
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    
+    const dateStr = nextMonday.toISOString().split('T')[0];
+    document.getElementById('new-start-date').value = dateStr;
+    
+    document.getElementById('newScheduleModal').classList.add('active');
+}
+
+function closeNewScheduleModal() {
+    document.getElementById('newScheduleModal').classList.remove('active');
+}
+
+// OCR Functions
+function openOCRModal() {
+    document.getElementById('ocrModal').classList.add('active');
+    document.getElementById('schedule-image').value = '';
+    document.getElementById('image-preview').style.display = 'none';
+}
+
+function closeOCRModal() {
+    document.getElementById('ocrModal').classList.remove('active');
+}
+
+// Image preview
+document.addEventListener('DOMContentLoaded', function() {
+    const imageInput = document.getElementById('schedule-image');
+    if (imageInput) {
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('image-preview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    // Form submission loading state
+    const ocrForm = document.getElementById('ocrForm');
+    if (ocrForm) {
+        ocrForm.addEventListener('submit', function() {
+            const submitBtn = document.getElementById('ocr-submit');
+            submitBtn.querySelector('.btn-text').style.display = 'none';
+            submitBtn.querySelector('.btn-loading').style.display = 'inline';
+            submitBtn.disabled = true;
+        });
+    }
+});
+</script>
+{% endblock %}

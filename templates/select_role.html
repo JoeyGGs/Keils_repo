@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Role - Keil's Service Deli</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🥪 Keil's Service Deli</h1>
+                <p>Select Your Role</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="role-selection">
+                <p class="role-prompt">Who is managing today?</p>
+                
+                {% for role in roles %}
+                <form method="POST" style="margin-bottom: 15px;">
+                    <input type="hidden" name="role" value="{{ role }}">
+                    <button type="submit" class="btn btn-role btn-full">
+                        <span class="role-icon">👤</span>
+                        <span class="role-name">{{ role }}</span>
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+
+            <div class="login-footer">
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline">← Back to Login</a>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        .role-selection {
+            margin: 20px 0;
+        }
+        
+        .role-prompt {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        
+        .btn-role {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px;
+            font-size: 1.25rem;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-role:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+        }
+        
+        .role-icon {
+            font-size: 1.5rem;
+        }
+        
+        .role-name {
+            font-weight: 600;
+        }
+    </style>
+</body>
+</html>

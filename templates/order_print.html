@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order - {{ vendor.name }} - Keil's Service Deli</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12pt;
+            line-height: 1.4;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            font-size: 24pt;
+            margin-bottom: 5px;
+        }
+        
+        .header h2 {
+            font-size: 16pt;
+            font-weight: normal;
+        }
+        
+        .header .date {
+            margin-top: 10px;
+            font-size: 11pt;
+        }
+        
+        .vendor-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+        }
+        
+        .vendor-info h3 {
+            margin-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background: #333;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        .qty-input {
+            width: 80px;
+            text-align: center;
+            border: 1px solid #999;
+            padding: 3px;
+        }
+        
+        .totals {
+            text-align: right;
+            font-size: 14pt;
+            font-weight: bold;
+        }
+        
+        .signature-section {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .signature-line {
+            width: 45%;
+        }
+        
+        .signature-line p {
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            margin-top: 40px;
+        }
+        
+        .notes {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            min-height: 80px;
+        }
+        
+        .notes h4 {
+            margin-bottom: 10px;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+        }
+        
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14pt;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">🖨️ Print Order</button>
+    
+    <div class="header">
+        <h1>KEIL'S SERVICE DELI</h1>
+        <h2>Purchase Order</h2>
+        <p class="date">Date: {{ order.generated_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    
+    <div class="vendor-info">
+        <div>
+            <h3>Vendor: {{ vendor.name }}</h3>
+            <p>Contact: {{ vendor.contact_name or '_______________' }}</p>
+        </div>
+        <div>
+            <p>Phone: {{ vendor.phone or '_______________' }}</p>
+            <p>Email: {{ vendor.email or '_______________' }}</p>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Current Stock</th>
+                <th>Order Qty</th>
+                <th>Unit</th>
+                <th>Unit Cost</th>
+                <th>Est. Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item_data in order.items %}
+            <tr>
+                <td>{{ item_data.item.name }}</td>
+                <td>{{ item_data.item.category.value }}</td>
+                <td>{{ "%.1f"|format(item_data.item.quantity) }}</td>
+                <td><input type="text" class="qty-input" value="{{ "%.0f"|format(item_data.suggested_quantity) }}"></td>
+                <td>{{ item_data.item.unit }}</td>
+                <td>${{ "%.2f"|format(item_data.item.cost_per_unit) }}</td>
+                <td>${{ "%.2f"|format(item_data.estimated_cost) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="totals">
+        <p>Estimated Total: ${{ "%.2f"|format(order.total_estimated_cost) }}</p>
+    </div>
+    
+    <div class="signature-section">
+        <div class="signature-line">
+            <p>Ordered By</p>
+        </div>
+        <div class="signature-line">
+            <p>Date</p>
+        </div>
+    </div>
+    
+    <div class="notes">
+        <h4>Notes:</h4>
+        <p>{{ vendor.notes or '' }}</p>
+    </div>
+</body>
+</html>

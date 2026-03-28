@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Order Sheets - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="orders-page">
+    <div class="page-header">
+        <h2>Order Sheets</h2>
+        <p>Generate and print order sheets for vendors</p>
+    </div>
+
+    {% if low_stock %}
+    <div class="card alert-card">
+        <div class="card-header">
+            <h3>⚠️ Items Needing Reorder ({{ low_stock|length }})</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Current</th>
+                        <th>Minimum</th>
+                        <th>Unit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in low_stock %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.category.value }}</td>
+                        <td class="text-danger">{{ "%.1f"|format(item.quantity) }}</td>
+                        <td>{{ "%.1f"|format(item.min_quantity) }}</td>
+                        <td>{{ item.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body">
+            <p class="empty-state success">✓ All items are adequately stocked!</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <h3 class="section-title">Vendor Order Sheets</h3>
+    
+    <div class="vendor-grid">
+        {% for order in vendor_orders %}
+        <div class="card vendor-card">
+            <div class="card-header">
+                <h3>{{ order.vendor.name }}</h3>
+                {% if order['items'] %}
+                <span class="badge badge-warning">{{ order['items']|length }} items</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p><strong>Categories:</strong> {{ order.vendor.categories|join(', ') }}</p>
+                {% if order.vendor.phone %}
+                <p><strong>Phone:</strong> {{ order.vendor.phone }}</p>
+                {% endif %}
+                {% if order['items'] %}
+                <p class="total"><strong>Est. Total:</strong> ${{ "%.2f"|format(order.total_estimated_cost) }}</p>
+                <div class="card-actions">
+                    <a href="{{ url_for('order_sheet', vendor_id=order.vendor.id) }}" class="btn btn-sm">View Order</a>
+                    <a href="{{ url_for('print_order', vendor_id=order.vendor.id) }}" class="btn btn-sm btn-primary" target="_blank">🖨️ Print</a>
+                </div>
+                {% else %}
+                <p class="empty-state">No items to order</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

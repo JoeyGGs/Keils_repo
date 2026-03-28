@@ -1,0 +1,55 @@
+[
+  {
+    "id": "V001",
+    "name": "Boar's Head",
+    "contact_name": "",
+    "phone": "1-800-352-6277",
+    "email": "",
+    "categories": [
+      "MEATS",
+      "CHEESES"
+    ],
+    "notes": "Premium deli meats and cheeses"
+  },
+  {
+    "id": "V002",
+    "name": "KeHe",
+    "contact_name": "",
+    "phone": "",
+    "email": "",
+    "categories": [
+      "MEATS",
+      "CHEESES",
+      "CONDIMENTS",
+      "SUPPLIES",
+      "BREADS"
+    ],
+    "notes": "General food service distributor"
+  },
+  {
+    "id": "V003",
+    "name": "US Foods",
+    "contact_name": "",
+    "phone": "",
+    "email": "",
+    "categories": [
+      "MEATS",
+      "CHEESES",
+      "SALADS",
+      "CONDIMENTS",
+      "SUPPLIES"
+    ],
+    "notes": "Food service distributor"
+  },
+  {
+    "id": "V004",
+    "name": "Shamrock",
+    "contact_name": "",
+    "phone": "",
+    "email": "",
+    "categories": [
+      "BREADS"
+    ],
+    "notes": "Food service distributor"
+  }
+]

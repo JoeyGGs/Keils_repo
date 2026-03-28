@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+
+{% block title %}Orders & Inventory - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="orders-inventory-page">
+    <div class="page-header">
+        <h2>Orders & Inventory</h2>
+        <div class="header-actions">
+            {% if low_stock_count > 0 %}
+            <span class="badge badge-warning">{{ low_stock_count }} Low Stock</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="showTab('orders')">📦 Orders</button>
+        <button class="tab-btn" onclick="showTab('inventory')">📋 Inventory</button>
+        <button class="tab-btn" onclick="showTab('vendors')">🏪 Vendors</button>
+        <button class="tab-btn" onclick="showTab('count')">📊 Order Count</button>
+    </div>
+
+    <!-- Orders Tab -->
+    <div id="orders-tab" class="tab-content active">
+        {% if low_stock %}
+        <div class="card alert-card">
+            <div class="card-header">
+                <h3>⚠️ Items Needing Reorder ({{ low_stock|length }})</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Current</th>
+                            <th>Minimum</th>
+                            <th>Unit</th>
+                            <th>Supplier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in low_stock %}
+                        <tr>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.category.value }}</td>
+                            <td class="text-danger">{{ "%.1f"|format(item.quantity) }}</td>
+                            <td>{{ "%.1f"|format(item.min_quantity) }}</td>
+                            <td>{{ item.unit }}</td>
+                            <td>{{ item.supplier or 'Not assigned' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="empty-state success">✓ All items are adequately stocked!</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <h3 class="section-title">Vendor Order Sheets</h3>
+        
+        <div class="vendor-grid">
+            {% for order in vendor_orders %}
+            <div class="card vendor-card">
+                <div class="card-header">
+                    <h3>{{ order.vendor.name }}</h3>
+                    {% if order['items'] %}
+                    <span class="badge badge-warning">{{ order['items']|length }} items</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if order.vendor.phone %}
+                    <p><strong>Phone:</strong> {{ order.vendor.phone }}</p>
+                    {% endif %}
+                    {% if order['items'] %}
+                    <p class="total"><strong>Est. Total:</strong> ${{ "%.2f"|format(order.total_estimated_cost) }}</p>
+                    <div class="card-actions">
+                        <a href="{{ url_for('order_sheet', vendor_id=order.vendor.id) }}" class="btn btn-sm">View Order</a>
+                        <a href="{{ url_for('print_order', vendor_id=order.vendor.id) }}" class="btn btn-sm btn-primary" target="_blank">🖨️ Print</a>
+                    </div>
+                    {% else %}
+                    <p class="empty-state">No items to order</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Inventory Tab -->
+    <div id="inventory-tab" class="tab-content">
+        <div class="tab-header-actions">
+            <button class="btn btn-primary" onclick="document.getElementById('addItemModal').classList.add('active')">+ Add Item</button>
+        </div>
+
+        {% if items %}
+        {% for category, cat_items in by_category.items() %}
+        <div class="card category-card">
+            <div class="card-header">
+                <h3>{{ category }}</h3>
+                <span class="item-count">{{ cat_items|length }} items</span>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Quantity</th>
+                            <th>Min Qty</th>
+                            <th>Unit</th>
+                            <th>Supplier</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cat_items|sort(attribute='name') %}
+                        <tr class="{% if item.is_low_stock %}low-stock{% endif %}">
+                            <td><strong>{{ item.name }}</strong></td>
+                            <td>{{ "%.1f"|format(item.quantity) }}</td>
+                            <td>{{ "%.1f"|format(item.min_quantity) }}</td>
+                            <td>{{ item.unit }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('update_item_vendor', item_id=item.id) }}" class="vendor-select-form">
+                                    <select name="supplier" onchange="this.form.submit()" class="vendor-select">
+                                        <option value="">-- Select Vendor --</option>
+                                        {% for vendor in vendors %}
+                                        <option value="{{ vendor.name }}" {% if item.supplier == vendor.name %}selected{% endif %}>{{ vendor.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            </td>
+                            <td>
+                                {% if item.is_low_stock %}
+                                <span class="badge badge-danger">Low Stock</span>
+                                {% else %}
+                                <span class="badge badge-success">OK</span>
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                <button class="btn btn-xs" onclick="openUpdateModal('{{ item.id }}', '{{ item.name }}', {{ item.quantity }}, '{{ item.supplier }}')">Update</button>
+                                {% if session.user.role == 'manager' %}
+                                <form method="POST" action="{{ url_for('delete_inventory', item_id=item.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Delete {{ item.name }}?')">×</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="empty-state">No inventory items. Add items to start tracking.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Vendors Tab -->
+    <div id="vendors-tab" class="tab-content">
+        <div class="vendors-grid">
+            {% for vendor in vendors %}
+            <div class="card vendor-detail-card">
+                <div class="card-header">
+                    <h3>{{ vendor.name }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="vendor-categories">
+                        {% for cat in vendor.categories %}
+                        <span class="badge">{{ cat }}</span>
+                        {% endfor %}
+                    </div>
+                    
+                    <form method="POST" action="{{ url_for('update_vendor', vendor_id=vendor.id) }}">
+                        <div class="form-group">
+                            <label>Vendor Name</label>
+                            <input type="text" name="name" value="{{ vendor.name }}" placeholder="Vendor name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Name</label>
+                            <input type="text" name="contact_name" value="{{ vendor.contact_name }}" placeholder="Contact person">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" name="phone" value="{{ vendor.phone }}" placeholder="Phone number">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" value="{{ vendor.email }}" placeholder="Email address">
+                        </div>
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea name="notes" rows="2" placeholder="Ordering notes, account numbers, etc.">{{ vendor.notes }}</textarea>
+                        </div>
+                        {% if session.user.role == 'manager' %}
+                        <div class="vendor-actions">
+                            <button type="submit" class="btn btn-primary">Update Vendor</button>
+                        </div>
+                        {% endif %}
+                    </form>
+                    {% if session.user.role == 'manager' %}
+                    <form method="POST" action="{{ url_for('delete_vendor', vendor_id=vendor.id) }}" class="delete-vendor-form">
+                        <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('Delete {{ vendor.name }}? This cannot be undone.')">Delete Vendor</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Order Count Tab -->
+    <div id="count-tab" class="tab-content">
+        <div class="count-header">
+            <h3>Inventory Count</h3>
+            <p class="description">Full physical inventory count - done every 6 months to verify actual quantities match system records.</p>
+        </div>
+
+        <!-- Status Summary -->
+        <div class="count-status-cards">
+            <div class="card status-card">
+                <div class="card-body">
+                    <div class="status-icon">📅</div>
+                    <div class="status-info">
+                        <span class="status-label">Last Count</span>
+                        <span class="status-value">
+                            {% if last_count %}
+                            {{ last_count.count_date.strftime('%B %d, %Y') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card status-card">
+                <div class="card-body">
+                    <div class="status-icon">⏰</div>
+                    <div class="status-info">
+                        <span class="status-label">Next Count Due</span>
+                        <span class="status-value {% if next_count_due and next_count_due <= today %}text-danger{% endif %}">
+                            {% if next_count_due %}
+                            {{ next_count_due.strftime('%B %d, %Y') }}
+                            {% else %}
+                            Start First Count
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card status-card">
+                <div class="card-body">
+                    <div class="status-icon">📦</div>
+                    <div class="status-info">
+                        <span class="status-label">Items to Count</span>
+                        <span class="status-value">{{ items|length }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Count (if active) -->
+        {% if current_count %}
+        <div class="card alert-card">
+            <div class="card-header">
+                <h3>🔄 Count In Progress</h3>
+                <span class="badge badge-warning">Started {{ current_count.started_at.strftime('%b %d, %Y at %I:%M %p') }}</span>
+            </div>
+            <div class="card-body">
+                <p>Started by: <strong>{{ current_count.counted_by }}</strong></p>
+                <p>Items to count: <strong>{{ current_count.total_items }}</strong></p>
+                <div class="card-actions">
+                    <a href="{{ url_for('view_inventory_count', count_id=current_count.id) }}" class="btn btn-primary">Continue Counting</a>
+                    {% if session.user.role == 'manager' %}
+                    <form method="POST" action="{{ url_for('delete_inventory_count', count_id=current_count.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Cancel this count?')">Cancel Count</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Start New Count Button -->
+        <div class="card">
+            <div class="card-body" style="text-align: center; padding: 2rem;">
+                <h4>Ready to Start a New Count?</h4>
+                <p>Starting a count will create a checklist of all {{ items|length }} inventory items for you to physically verify.</p>
+                <form method="POST" action="{{ url_for('start_inventory_count') }}">
+                    <button type="submit" class="btn btn-primary btn-lg">📊 Start New Inventory Count</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Count History -->
+        {% if completed_counts %}
+        <h3 class="section-title">Count History</h3>
+        <div class="card">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Counted By</th>
+                            <th>Items</th>
+                            <th>Variances</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for count in completed_counts[:10] %}
+                        <tr>
+                            <td>{{ count.count_date.strftime('%B %d, %Y') }}</td>
+                            <td>{{ count.counted_by }}</td>
+                            <td>{{ count.total_items }}</td>
+                            <td>
+                                {% if count.items_with_variance > 0 %}
+                                <span class="badge badge-warning">{{ count.items_with_variance }} items</span>
+                                {% else %}
+                                <span class="badge badge-success">None</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('view_inventory_count', count_id=count.id) }}" class="btn btn-xs">View</a>
+                                {% if session.user.role == 'manager' %}
+                                <form method="POST" action="{{ url_for('delete_inventory_count', count_id=count.id) }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Delete this count?')">×</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div id="addItemModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Inventory Item</h3>
+            <button class="modal-close" onclick="document.getElementById('addItemModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_inventory') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Item Name *</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select name="category" required>
+                        {% for cat in categories %}
+                        <option value="{{ cat.name }}">{{ cat.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Current Quantity</label>
+                        <input type="number" name="quantity" value="0" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit</label>
+                        <input type="text" name="unit" value="each" placeholder="lbs, each, gallons">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Minimum Quantity</label>
+                        <input type="number" name="min_quantity" value="5" step="0.1" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cost Type</label>
+                        <select name="cost_type" id="costTypeSelect" onchange="updateCostLabel()">
+                            <option value="unit">Cost per Unit</option>
+                            <option value="lbs">Cost per Lbs</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="costLabel">Cost per Unit ($)</label>
+                        <input type="number" name="cost" value="0" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Supplier</label>
+                    <select name="supplier">
+                        <option value="">-- Select Vendor --</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('addItemModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Item</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Update Quantity Modal -->
+<div id="updateModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Update Item</h3>
+            <button class="modal-close" onclick="document.getElementById('updateModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" id="updateForm">
+            <div class="modal-body">
+                <p><strong id="updateItemName"></strong></p>
+                <p>Current: <span id="updateCurrentQty"></span></p>
+                
+                <div class="form-group">
+                    <label>Action</label>
+                    <select name="action" id="updateAction">
+                        <option value="set">Set to</option>
+                        <option value="add">Add</option>
+                        <option value="subtract">Subtract</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" name="amount" id="updateAmount" step="0.1" min="0" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('updateModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
+    event.target.classList.add('active');
+    
+    // Save to localStorage
+    localStorage.setItem('activeOrdersInventoryTab', tabName);
+}
+
+function openUpdateModal(itemId, itemName, currentQty, supplier) {
+    document.getElementById('updateForm').action = '/inventory/update/' + itemId;
+    document.getElementById('updateItemName').textContent = itemName;
+    document.getElementById('updateCurrentQty').textContent = currentQty;
+    document.getElementById('updateAmount').value = currentQty;
+    document.getElementById('updateModal').classList.add('active');
+}
+
+function updateCostLabel() {
+    const costType = document.getElementById('costTypeSelect').value;
+    const costLabel = document.getElementById('costLabel');
+    if (costType === 'lbs') {
+        costLabel.textContent = 'Cost per Lbs ($)';
+    } else {
+        costLabel.textContent = 'Cost per Unit ($)';
+    }
+}
+
+// Restore tab from localStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTab = localStorage.getItem('activeOrdersInventoryTab');
+    if (savedTab) {
+        const tabBtn = document.querySelector('.tab-btn[onclick*="' + savedTab + '"]');
+        if (tabBtn) {
+            tabBtn.click();
+        }
+    }
+});
+</script>
+{% endblock %}

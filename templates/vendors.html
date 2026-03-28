@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="vendors-page">
+    <div class="page-header">
+        <h2>Vendor Directory</h2>
+    </div>
+
+    <div class="vendors-grid">
+        {% for vendor in vendors %}
+        <div class="card vendor-detail-card">
+            <div class="card-header">
+                <h3>{{ vendor.name }}</h3>
+            </div>
+            <div class="card-body">
+                <div class="vendor-categories">
+                    {% for cat in vendor.categories %}
+                    <span class="badge">{{ cat }}</span>
+                    {% endfor %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('update_vendor', vendor_id=vendor.id) }}">
+                    <div class="form-group">
+                        <label>Contact Name</label>
+                        <input type="text" name="contact_name" value="{{ vendor.contact_name }}" placeholder="Contact person">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" name="phone" value="{{ vendor.phone }}" placeholder="Phone number">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" value="{{ vendor.email }}" placeholder="Email address">
+                    </div>
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="2" placeholder="Ordering notes, account numbers, etc.">{{ vendor.notes }}</textarea>
+                    </div>
+                    {% if session.user.role == 'manager' %}
+                    <button type="submit" class="btn btn-primary btn-full">Update Vendor</button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

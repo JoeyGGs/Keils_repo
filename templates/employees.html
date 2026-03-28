@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="employees-page">
+    <div class="page-header">
+        <h2>Employees</h2>
+        {% if session.user.role == 'manager' %}
+        <button class="btn btn-primary" onclick="document.getElementById('addEmployeeModal').classList.add('active')">+ Add Employee</button>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if employees %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Max Hours/Week</th>
+                        {% if session.user.role == 'manager' %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr>
+                        <td><strong>{{ emp.name }}</strong></td>
+                        <td>
+                            {% if session.user.role == 'manager' %}
+                            <form method="POST" action="{{ url_for('update_employee', emp_id=emp.id) }}" class="position-form">
+                                <select name="position" onchange="this.form.submit()" class="position-select">
+                                    <option value="Deli Associate" {% if emp.position == 'Deli Associate' %}selected{% endif %}>Deli Associate</option>
+                                    <option value="Assistant Manager" {% if emp.position == 'Assistant Manager' %}selected{% endif %}>Assistant Manager</option>
+                                    <option value="Deli Manager" {% if emp.position == 'Deli Manager' %}selected{% endif %}>Deli Manager</option>
+                                </select>
+                            </form>
+                            {% else %}
+                            {{ emp.position }}
+                            {% endif %}
+                        </td>
+                        <td>{{ emp.phone or '-' }}</td>
+                        <td>{{ emp.email or '-' }}</td>
+                        <td>{{ emp.max_hours_per_week }} hrs</td>
+                        {% if session.user.role == 'manager' %}
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_employee', emp_id=emp.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Remove {{ emp.name }}?')">Delete</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state">No employees yet. Add your first employee to get started.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div id="addEmployeeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Employee</h3>
+            <button class="modal-close" onclick="document.getElementById('addEmployeeModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_employee') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Position</label>
+                    <select name="position">
+                        <option value="Deli Associate">Deli Associate</option>
+                        <option value="Assistant Manager">Assistant Manager</option>
+                        <option value="Deli Manager">Deli Manager</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Max Hours/Week</label>
+                    <input type="number" name="max_hours" value="40" min="1" max="60">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('addEmployeeModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

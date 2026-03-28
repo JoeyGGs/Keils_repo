@@ -1,0 +1,134 @@
+[
+  {
+    "id": "EMP001",
+    "name": "Michael",
+    "phone": "",
+    "email": "",
+    "position": "Deli Manager",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP002",
+    "name": "Steve",
+    "phone": "",
+    "email": "",
+    "position": "Assistant Manager",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP003",
+    "name": "Lilah",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP004",
+    "name": "Erin",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP005",
+    "name": "Rashid",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP006",
+    "name": "Haley",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP007",
+    "name": "Ellen",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP008",
+    "name": "Mirna",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP009",
+    "name": "Gianni",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP010",
+    "name": "Joey",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP012",
+    "name": "Richard",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP013",
+    "name": "Simon",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  }
+]

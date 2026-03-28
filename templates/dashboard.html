@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="page-header">
+        <h2>Dashboard</h2>
+        <p class="date">{{ today.strftime('%A, %B %d, %Y') }} - {{ current_time.strftime('%I:%M %p') }}</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+                <h3>{{ total_employees }}</h3>
+                <p>Total Employees</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-info">
+                <h3>{{ today_shifts|length }}</h3>
+                <p>Shifts Today</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-info">
+                <h3>{{ on_duty|length }}</h3>
+                <p>Currently On Duty</p>
+            </div>
+        </div>
+        <div class="stat-card {% if low_stock|length > 0 %}alert-card{% endif %}">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-info">
+                <h3>{{ low_stock|length }}</h3>
+                <p>Low Stock Items</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card">
+            <div class="card-header">
+                <h3>📅 Today's Shifts</h3>
+                <a href="{{ url_for('schedule') }}" class="btn btn-sm">View All</a>
+            </div>
+            <div class="card-body">
+                {% if today_shifts %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for shift in today_shifts %}
+                        <tr>
+                            <td>{{ shift.employee_name }}</td>
+                            <td>{{ shift.start_time.strftime('%I:%M %p') }} - {{ shift.end_time.strftime('%I:%M %p') }}</td>
+                            <td>
+                                {% if shift in on_duty %}
+                                <span class="badge badge-success">On Duty</span>
+                                {% elif shift.end_time < current_time.time() %}
+                                <span class="badge badge-gray">Completed</span>
+                                {% else %}
+                                <span class="badge badge-info">Upcoming</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="empty-state">No shifts scheduled for today</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>⚠️ Low Stock Alert</h3>
+                <a href="{{ url_for('orders') }}" class="btn btn-sm">Create Orders</a>
+            </div>
+            <div class="card-body">
+                {% if low_stock %}
+                <ul class="alert-list">
+                    {% for item in low_stock[:5] %}
+                    <li class="alert-item">
+                        <span class="item-name">{{ item.name }}</span>
+                        <span class="item-qty">{{ item.quantity }} / {{ item.min_quantity }} {{ item.unit }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if low_stock|length > 5 %}
+                <p class="more-link">+ {{ low_stock|length - 5 }} more items</p>
+                {% endif %}
+                {% else %}
+                <p class="empty-state success">✓ All items are stocked</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>🟢 Currently On Duty</h3>
+            </div>
+            <div class="card-body">
+                {% if on_duty %}
+                <ul class="staff-list">
+                    {% for shift in on_duty %}
+                    <li>
+                        <span class="staff-name">{{ shift.employee_name }}</span>
+                        <span class="staff-time">until {{ shift.end_time.strftime('%I:%M %p') }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="empty-state">No staff currently on duty</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>📊 This Week</h3>
+            </div>
+            <div class="card-body">
+                <div class="week-summary">
+                    <div class="summary-item">
+                        <span class="label">Total Hours Scheduled</span>
+                        <span class="value">{{ "%.1f"|format(total_hours) }} hrs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

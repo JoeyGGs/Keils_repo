@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Count - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="inventory-count-page">
+    <div class="page-header">
+        <h2>Inventory Count</h2>
+        <div class="header-actions">
+            <a href="{{ url_for('orders_inventory') }}" class="btn btn-outline">← Back</a>
+        </div>
+    </div>
+
+    <!-- Count Info -->
+    <div class="count-info-card card">
+        <div class="card-body">
+            <div class="count-info-grid">
+                <div class="info-item">
+                    <span class="label">Date:</span>
+                    <span class="value">{{ count.count_date.strftime('%B %d, %Y') }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Started:</span>
+                    <span class="value">{{ count.started_at.strftime('%I:%M %p') }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Counted By:</span>
+                    <span class="value">{{ count.counted_by }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Status:</span>
+                    <span class="badge {% if count.status == 'completed' %}badge-success{% else %}badge-warning{% endif %}">
+                        {{ count.status|capitalize }}
+                    </span>
+                </div>
+                {% if count.completed_at %}
+                <div class="info-item">
+                    <span class="label">Completed:</span>
+                    <span class="value">{{ count.completed_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if count.status == 'in_progress' %}
+    <!-- Active Count Form -->
+    <form method="POST" action="{{ url_for('update_inventory_count', count_id=count.id) }}" id="countForm">
+        {% for category, entries in by_category.items() %}
+        <div class="card category-card">
+            <div class="card-header">
+                <h3>{{ category }}</h3>
+                <span class="item-count">{{ entries|length }} items</span>
+            </div>
+            <div class="card-body">
+                <table class="table count-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Expected</th>
+                            <th>Actual Count</th>
+                            <th>Unit</th>
+                            <th>Difference</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries|sort(attribute='item_name') %}
+                        <tr class="{% if entry.difference != 0 %}has-variance{% endif %}">
+                            <td><strong>{{ entry.item_name }}</strong></td>
+                            <td class="expected-qty">{{ "%.1f"|format(entry.expected_quantity) }}</td>
+                            <td class="count-input">
+                                <input type="number" 
+                                       name="qty_{{ entry.item_id }}" 
+                                       value="{{ entry.counted_quantity }}" 
+                                       step="0.1" 
+                                       min="0"
+                                       class="qty-input"
+                                       data-expected="{{ entry.expected_quantity }}"
+                                       onchange="updateDifference(this)">
+                            </td>
+                            <td>{{ entry.unit }}</td>
+                            <td class="difference-cell">
+                                <span class="difference-value" id="diff_{{ entry.item_id }}">
+                                    {% set diff = entry.counted_quantity - entry.expected_quantity %}
+                                    {% if diff > 0 %}+{% endif %}{{ "%.1f"|format(diff) }}
+                                </span>
+                            </td>
+                            <td class="notes-cell">
+                                <input type="text" 
+                                       name="notes_{{ entry.item_id }}" 
+                                       value="{{ entry.notes }}"
+                                       placeholder="Notes..."
+                                       class="notes-input">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="count-actions">
+            <button type="submit" class="btn btn-primary">💾 Save Progress</button>
+            <button type="button" class="btn btn-success" onclick="document.getElementById('completeModal').classList.add('active')">✓ Complete Count</button>
+        </div>
+    </form>
+
+    <!-- Complete Count Modal -->
+    <div id="completeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Complete Inventory Count</h3>
+                <button class="modal-close" onclick="document.getElementById('completeModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('complete_inventory_count', count_id=count.id) }}">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="apply_to_inventory" value="yes" checked>
+                            Apply counted quantities to inventory
+                        </label>
+                        <small class="help-text">This will update all inventory quantities to match your physical count.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <textarea name="notes" rows="3" placeholder="Any notes about this count..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('completeModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Complete Count</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Completed Count View -->
+    {% for category, entries in by_category.items() %}
+    <div class="card category-card">
+        <div class="card-header">
+            <h3>{{ category }}</h3>
+            <span class="item-count">{{ entries|length }} items</span>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Expected</th>
+                        <th>Counted</th>
+                        <th>Unit</th>
+                        <th>Difference</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries|sort(attribute='item_name') %}
+                    <tr class="{% if entry.difference != 0 %}has-variance{% endif %}">
+                        <td><strong>{{ entry.item_name }}</strong></td>
+                        <td>{{ "%.1f"|format(entry.expected_quantity) }}</td>
+                        <td>{{ "%.1f"|format(entry.counted_quantity) }}</td>
+                        <td>{{ entry.unit }}</td>
+                        <td class="{% if entry.difference < 0 %}text-danger{% elif entry.difference > 0 %}text-success{% endif %}">
+                            {% if entry.difference > 0 %}+{% endif %}{{ "%.1f"|format(entry.difference) }}
+                        </td>
+                        <td>{{ entry.notes }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if count.notes %}
+    <div class="card">
+        <div class="card-header">
+            <h3>Count Notes</h3>
+        </div>
+        <div class="card-body">
+            <p>{{ count.notes }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Summary -->
+    <div class="card summary-card">
+        <div class="card-header">
+            <h3>Summary</h3>
+        </div>
+        <div class="card-body">
+            <div class="summary-stats">
+                <div class="stat">
+                    <span class="stat-value">{{ count.total_items }}</span>
+                    <span class="stat-label">Total Items</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value {% if count.items_with_variance > 0 %}text-warning{% endif %}">{{ count.items_with_variance }}</span>
+                    <span class="stat-label">Items with Variance</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateDifference(input) {
+    const expected = parseFloat(input.dataset.expected);
+    const counted = parseFloat(input.value) || 0;
+    const diff = counted - expected;
+    
+    const itemId = input.name.replace('qty_', '');
+    const diffSpan = document.getElementById('diff_' + itemId);
+    
+    if (diffSpan) {
+        let displayText = diff.toFixed(1);
+        if (diff > 0) displayText = '+' + displayText;
+        diffSpan.textContent = displayText;
+        
+        // Update row styling
+        const row = input.closest('tr');
+        if (diff !== 0) {
+            row.classList.add('has-variance');
+            diffSpan.classList.remove('text-success', 'text-danger');
+            diffSpan.classList.add(diff < 0 ? 'text-danger' : 'text-success');
+        } else {
+            row.classList.remove('has-variance');
+            diffSpan.classList.remove('text-success', 'text-danger');
+        }
+    }
+}
+
+// Initialize all differences on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.qty-input').forEach(function(input) {
+        updateDifference(input);
+    });
+});
+</script>
+{% endblock %}

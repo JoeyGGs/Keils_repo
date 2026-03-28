@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Schedule {{ week_start.strftime('%m/%d') }} - {{ week_end.strftime('%m/%d/%Y') }} - Keil's Service Deli</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            padding: 15px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 14pt;
+            margin-bottom: 5px;
+        }
+        
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            border: 1px solid #000;
+            padding: 6px 4px;
+            text-align: center;
+        }
+        
+        .schedule-table th {
+            background: #e5e5e5;
+            font-weight: bold;
+        }
+        
+        .name-col {
+            text-align: left !important;
+            font-weight: bold;
+            width: 100px;
+        }
+        
+        .day-col {
+            width: 100px;
+        }
+        
+        .totals-col {
+            width: 60px;
+            background: #f0f0f0;
+            font-weight: bold;
+        }
+        
+        .day-header {
+            font-weight: bold;
+        }
+        
+        .day-date {
+            font-size: 9pt;
+            font-weight: normal;
+        }
+        
+        .schedule-table tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        
+        .schedule-table tfoot td {
+            background: #e5e5e5;
+            font-weight: bold;
+        }
+        
+        .print-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 12pt;
+            border-radius: 5px;
+        }
+        
+        .print-btn:hover {
+            background: #1d4ed8;
+        }
+        
+        @media print {
+            body {
+                padding: 0;
+                font-size: 10pt;
+            }
+            
+            .print-btn {
+                display: none;
+            }
+            
+            .schedule-table {
+                font-size: 9pt;
+            }
+            
+            .schedule-table th,
+            .schedule-table td {
+                padding: 4px 2px;
+            }
+        }
+        
+        @page {
+            size: landscape;
+            margin: 0.5in;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn" onclick="window.print()">🖨️ Print Schedule</button>
+    
+    <div class="header">
+        <h1>KEIL'S SERVICE DELI - WEEKLY SCHEDULE</h1>
+        <p>Week of {{ week_start.strftime('%B %d') }} - {{ week_end.strftime('%B %d, %Y') }}</p>
+    </div>
+    
+    <table class="schedule-table">
+        <thead>
+            <tr>
+                <th class="name-col">Name</th>
+                {% for day in days %}
+                <th class="day-col">
+                    <div class="day-header">{{ day.name[:3].upper() }}</div>
+                    <div class="day-date">{{ day.date.strftime('%m/%d') }}</div>
+                </th>
+                {% endfor %}
+                <th class="totals-col">TOTALS</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emp in schedule_data %}
+            <tr>
+                <td class="name-col">{{ emp.name }}</td>
+                {% for day_shift in emp.shifts %}
+                <td>{{ day_shift.display }}</td>
+                {% endfor %}
+                <td class="totals-col">{{ emp.total_hours|int }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td class="name-col">TOTAL HOURS</td>
+                {% for day in days %}
+                <td>{{ day.total_hours|int }}</td>
+                {% endfor %}
+                <td class="totals-col">{{ grand_total|int }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>
