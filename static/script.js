@@ -1,11 +1,58 @@
 // Keil's Service Deli - Frontend JavaScript
 
-// Auto-hide alerts after 5 seconds
+// Mobile Navigation
 document.addEventListener('DOMContentLoaded', function() {
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    const navOverlay = document.getElementById('navOverlay');
+
+    function openNav() {
+        navLinks && navLinks.classList.add('open');
+        navToggle && navToggle.classList.add('active');
+        navOverlay && navOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeNav() {
+        navLinks && navLinks.classList.remove('open');
+        navToggle && navToggle.classList.remove('active');
+        navOverlay && navOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    if (navToggle) {
+        navToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (navLinks.classList.contains('open')) {
+                closeNav();
+            } else {
+                openNav();
+            }
+        });
+    }
+
+    if (navOverlay) {
+        navOverlay.addEventListener('click', closeNav);
+    }
+
+    // Close nav when a link is tapped
+    if (navLinks) {
+        navLinks.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', closeNav);
+        });
+    }
+
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeNav();
+    });
+
+    // Auto-hide alerts after 5 seconds
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(alert => {
         setTimeout(() => {
             alert.style.opacity = '0';
+            alert.style.transition = 'opacity 0.3s';
             setTimeout(() => alert.remove(), 300);
         }, 5000);
     });

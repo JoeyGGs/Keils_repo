@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>{% block title %}Keil's Service Deli{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -10,20 +12,30 @@
     {% if session.user %}
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🥪 Keil's Service Deli</h1>
+            <h1>🥪 Keil's Deli</h1>
         </div>
-        <ul class="nav-links">
-            <li><a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="{{ url_for('schedule') }}" class="{% if request.endpoint == 'schedule' %}active{% endif %}">Schedule</a></li>
-            <li><a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}">Employees</a></li>
-            <li><a href="{{ url_for('orders_inventory') }}" class="{% if request.endpoint == 'orders_inventory' %}active{% endif %}">Orders & Inventory</a></li>
-            <li><a href="{{ url_for('kehe') }}" class="{% if request.endpoint == 'kehe' %}active{% endif %}">KeHE</a></li>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">📊 Dashboard</a></li>
+            <li><a href="{{ url_for('schedule') }}" class="{% if request.endpoint == 'schedule' %}active{% endif %}">📅 Schedule</a></li>
+            <li><a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}">👥 Employees</a></li>
+            <li><a href="{{ url_for('orders_inventory') }}" class="{% if request.endpoint == 'orders_inventory' %}active{% endif %}">📦 Orders</a></li>
+            <li><a href="{{ url_for('kehe') }}" class="{% if request.endpoint == 'kehe' %}active{% endif %}">🚚 KeHE</a></li>
+            <li class="nav-user-mobile">
+                <span>{{ session.user.display_role or session.user.name }}</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>
+            </li>
         </ul>
         <div class="nav-user">
-            <span>{{ session.user.display_role or session.user.name }} (Admin)</span>
+            <span>{{ session.user.display_role or session.user.name }}</span>
             <a href="{{ url_for('logout') }}" class="btn btn-sm">Logout</a>
         </div>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
     </nav>
+    <div class="nav-overlay" id="navOverlay"></div>
     {% endif %}
 
     <main class="container">
