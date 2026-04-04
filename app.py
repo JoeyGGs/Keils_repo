@@ -364,6 +364,18 @@ def update_shift():
                 station=station
             )
             shifts.append(new_shift)
+    elif shift_type == 'custom_text':
+        custom_text = request.form.get('custom_text', '').strip()
+        if custom_text:
+            shift_id = f"SH{employee_id}_{shift_date.isoformat()}"
+            new_shift = Shift(
+                id=shift_id,
+                employee_id=employee_id,
+                employee_name=employee_name,
+                date=shift_date,
+                custom_text=custom_text
+            )
+            shifts.append(new_shift)
     
     data_store.save_shifts(shifts)
     flash('Schedule updated', 'success')
@@ -373,81 +385,66 @@ def update_shift():
 @app.route('/schedule/create', methods=['POST'])
 @login_required
 def create_new_schedule():
-    start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
-    num_weeks = int(request.form.get('num_weeks', 4))
-    copy_current = request.form.get('copy_current') == 'on'
-    
-    # Ensure start_date is a Monday
-    if start_date.weekday() != 0:
-        # Adjust to the Monday of that week
-        start_date = start_date - timedelta(days=start_date.weekday())
-    
-    shifts = data_store.load_shifts()
-    employees = data_store.load_employees()
-    
-    if copy_current:
-        # Get current week's schedule as template
-        today = date.today()
-        current_week_start = today - timedelta(days=today.weekday())
-        
-        # Build template from current week
-        template_shifts = []
-        for emp in employees:
-            for day_offset in range(7):
-                current_date = current_week_start + timedelta(days=day_offset)
-                shift = next((s for s in shifts if s.employee_id == emp.id and s.date == current_date), None)
-                if shift:
-                    template_shifts.append({
-                        'employee_id': emp.id,
-                        'employee_name': emp.name,
-                        'day_offset': day_offset,
-                        'start_time': shift.start_time,
-                        'end_time': shift.end_time,
-                        'station': shift.station,
-                        'is_off': shift.is_off,
-                        'is_request_off': shift.is_request_off
-                    })
-        
-        # Apply template to each week
-        for week in range(num_weeks):
-            week_start = start_date + timedelta(weeks=week)
-            
-            for template in template_shifts:
-                shift_date = week_start + timedelta(days=template['day_offset'])
-                
-                # Remove any existing shift for this employee on this date
-                shifts = [s for s in shifts if not (s.employee_id == template['employee_id'] and s.date == shift_date)]
-                
-                # Create new shift
-                shift_id = f"SH{template['employee_id']}_{shift_date.isoformat()}"
-                new_shift = Shift(
-                    id=shift_id,
-                    employee_id=template['employee_id'],
-                    employee_name=template['employee_name'],
-                    date=shift_date,
-                    start_time=template['start_time'],
-                    end_time=template['end_time'],
-                    station=template['station'],
-                    is_off=template['is_off'],
-                    is_request_off=template['is_request_off']
-                )
-                shifts.append(new_shift)
-        
-        data_store.save_shifts(shifts)
-        flash(f'Created {num_weeks} week(s) of schedule starting {start_date.strftime("%m/%d/%Y")}', 'success')
-    else:
-        # Just clear shifts in the date range (no template)
-        end_date = start_date + timedelta(weeks=num_weeks) - timedelta(days=1)
-        shifts = [s for s in shifts if not (start_date <= s.date <= end_date)]
-        data_store.save_shifts(shifts)
-        flash(f'Cleared schedule for {num_weeks} week(s) starting {start_date.strftime("%m/%d/%Y")}', 'success')
-    
-    # Navigate to the first week of new schedule
+    """Create next week's schedule from saved presets"""
     today = date.today()
     current_week_start = today - timedelta(days=today.weekday())
-    week_offset = (start_date - current_week_start).days // 7
-    
-    return redirect(url_for('schedule', week=week_offset))
+    # Target = next week from whichever week the user is currently viewing
+    view_offset = int(request.form.get('week_offset', 0))
+    next_week_start = current_week_start + timedelta(weeks=view_offset + 1)
+
+    presets = data_store.load_shift_presets()
+    if not presets:
+        flash('No presets saved yet — set up presets first', 'error')
+        return redirect(url_for('schedule', week=view_offset))
+
+    employees = data_store.load_employees()
+    shifts = data_store.load_shifts()
+
+    SHIFT_PRESETS = {
+        'opening': (time(5, 0), time(13, 30), 'BAR'),
+        'mid': (time(9, 30), time(18, 0), 'MID'),
+        'pm': (time(12, 0), time(20, 30), 'PM'),
+        'closing': (time(13, 0), time(21, 30), ''),
+    }
+
+    applied = 0
+    for emp in employees:
+        emp_presets = presets.get(emp.id)
+        if not emp_presets:
+            continue
+
+        for day_str, preset_info in emp_presets.items():
+            day_index = int(day_str)
+            shift_date = next_week_start + timedelta(days=day_index)
+            shift_type = preset_info.get('shift_type', '')
+            station = preset_info.get('station', '')
+
+            if not shift_type:
+                continue
+
+            # Remove existing shift for this employee on this date
+            shifts = [s for s in shifts if not (s.employee_id == emp.id and s.date == shift_date)]
+
+            shift_id = f"SH{emp.id}_{shift_date.isoformat()}"
+
+            if shift_type == 'off':
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_off=True)
+            elif shift_type == 'ro':
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_request_off=True)
+            elif shift_type in SHIFT_PRESETS:
+                start_t, end_t, default_station = SHIFT_PRESETS[shift_type]
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date,
+                                  start_time=start_t, end_time=end_t, station=station or default_station)
+            else:
+                continue
+
+            shifts.append(new_shift)
+            applied += 1
+
+    data_store.save_shifts(shifts)
+    next_week_offset = view_offset + 1
+    flash(f'Created schedule for week of {next_week_start.strftime("%m/%d/%Y")} ({applied} shifts from presets)', 'success')
+    return redirect(url_for('schedule', week=next_week_offset))
 
 
 @app.route('/schedule/delete/<shift_id>', methods=['POST'])
@@ -458,6 +455,106 @@ def delete_shift(shift_id):
     data_store.save_shifts(shifts)
     flash('Shift removed', 'success')
     return redirect(url_for('schedule'))
+
+
+@app.route('/schedule/delete-week', methods=['POST'])
+@login_required
+def delete_current_schedule():
+    """Delete all shifts for the currently viewed week"""
+    week_offset = int(request.form.get('week_offset', 0))
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+    week_end = week_start + timedelta(days=6)
+
+    shifts = data_store.load_shifts()
+    before = len(shifts)
+    shifts = [s for s in shifts if not (week_start <= s.date <= week_end)]
+    removed = before - len(shifts)
+    data_store.save_shifts(shifts)
+
+    flash(f'Deleted {removed} shift(s) for week of {week_start.strftime("%m/%d/%Y")}', 'success')
+    return redirect(url_for('schedule', week=week_offset))
+
+
+@app.route('/schedule/presets', methods=['GET'])
+@login_required
+def get_shift_presets():
+    """Return shift presets as JSON"""
+    presets = data_store.load_shift_presets()
+    return jsonify(presets)
+
+
+@app.route('/schedule/presets/save', methods=['POST'])
+@login_required
+def save_shift_presets():
+    """Save shift presets for employees"""
+    presets_data = request.get_json()
+    if presets_data is None:
+        return jsonify({'error': 'Invalid data'}), 400
+    data_store.save_shift_presets(presets_data)
+    return jsonify({'success': True})
+
+
+@app.route('/schedule/presets/apply', methods=['POST'])
+@login_required
+def apply_shift_presets():
+    """Apply saved presets to the current week's schedule"""
+    week_offset = int(request.form.get('week_offset', 0))
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+
+    presets = data_store.load_shift_presets()
+    if not presets:
+        flash('No presets saved yet', 'error')
+        return redirect(url_for('schedule', week=week_offset))
+
+    employees = data_store.load_employees()
+    shifts = data_store.load_shifts()
+
+    SHIFT_PRESETS = {
+        'opening': (time(5, 0), time(13, 30), 'BAR'),
+        'mid': (time(9, 30), time(18, 0), 'MID'),
+        'pm': (time(12, 0), time(20, 30), 'PM'),
+        'closing': (time(13, 0), time(21, 30), ''),
+    }
+
+    applied = 0
+    for emp in employees:
+        emp_presets = presets.get(emp.id)
+        if not emp_presets:
+            continue
+
+        for day_str, preset_info in emp_presets.items():
+            day_index = int(day_str)
+            shift_date = week_start + timedelta(days=day_index)
+            shift_type = preset_info.get('shift_type', '')
+            station = preset_info.get('station', '')
+
+            if not shift_type:
+                continue
+
+            # Remove existing shift for this employee on this date
+            shifts = [s for s in shifts if not (s.employee_id == emp.id and s.date == shift_date)]
+
+            shift_id = f"SH{emp.id}_{shift_date.isoformat()}"
+
+            if shift_type == 'off':
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_off=True)
+            elif shift_type == 'ro':
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_request_off=True)
+            elif shift_type in SHIFT_PRESETS:
+                start_t, end_t, default_station = SHIFT_PRESETS[shift_type]
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date,
+                                  start_time=start_t, end_time=end_t, station=station or default_station)
+            else:
+                continue
+
+            shifts.append(new_shift)
+            applied += 1
+
+    data_store.save_shifts(shifts)
+    flash(f'Applied {applied} preset shift(s) to week of {week_start.strftime("%m/%d/%Y")}', 'success')
+    return redirect(url_for('schedule', week=week_offset))
 
 
 @app.route('/schedule/ocr', methods=['POST'])
@@ -625,8 +722,25 @@ def update_employee(emp_id):
     
     for emp in employees:
         if emp.id == emp_id:
+            old_name = emp.name
+            if 'name' in request.form:
+                emp.name = request.form.get('name', emp.name)
             if 'position' in request.form:
-                emp.position = request.form.get('position')
+                emp.position = request.form.get('position', emp.position)
+            if 'phone' in request.form:
+                emp.phone = request.form.get('phone', '')
+            if 'email' in request.form:
+                emp.email = request.form.get('email', '')
+            if 'max_hours' in request.form:
+                emp.max_hours_per_week = int(request.form.get('max_hours', emp.max_hours_per_week))
+            
+            # Update name in existing shifts if changed
+            if emp.name != old_name:
+                shifts = data_store.load_shifts()
+                for s in shifts:
+                    if s.employee_id == emp_id:
+                        s.employee_name = emp.name
+                data_store.save_shifts(shifts)
             break
     
     data_store.save_employees(employees)

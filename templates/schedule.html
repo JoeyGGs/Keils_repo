@@ -15,9 +15,23 @@
             {% endif %}
         </div>
         <div class="schedule-actions">
-            <button onclick="openOCRModal()" class="btn btn-info">📷 Scan Schedule</button>
-            <button onclick="openNewScheduleModal()" class="btn btn-success">+ New Schedule</button>
-            <button onclick="window.print()" class="btn btn-primary">🖨️ Print</button>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" onclick="toggleScheduleMenu()">⚙️ Schedule Settings</button>
+                <div class="dropdown-menu" id="scheduleDropdown">
+                    <button class="dropdown-item" onclick="openOCRModal(); closeScheduleMenu();">📷 Scan Schedule</button>
+                    <button class="dropdown-item" onclick="openPresetsModal(); closeScheduleMenu();">🔁 Presets</button>
+                    <form method="POST" action="{{ url_for('create_new_schedule') }}" style="margin:0;">
+                        <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                        <button type="submit" class="dropdown-item">+ New Schedule</button>
+                    </form>
+                    <button class="dropdown-item" onclick="window.print(); closeScheduleMenu();">🖨️ Print</button>
+                    <div class="dropdown-divider"></div>
+                    <form method="POST" action="{{ url_for('delete_current_schedule') }}" style="margin:0;" onsubmit="return confirm('Delete all shifts for the week of {{ week_start.strftime('%m/%d/%Y') }}?');">
+                        <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                        <button type="submit" class="dropdown-item dropdown-item-danger">🗑️ Delete Current Schedule</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -97,6 +111,7 @@
                         <option value="off">OFF (Day Off)</option>
                         <option value="ro">R/O (Request Off)</option>
                         <option value="custom">Custom Time</option>
+                        <option value="custom_text">Custom Shift (type your own)</option>
                         <option value="clear">Clear / No Shift</option>
                     </select>
                 </div>
@@ -111,6 +126,14 @@
                             <label>End Time</label>
                             <input type="time" name="end_time" id="edit-end-time">
                         </div>
+                    </div>
+                </div>
+
+                <div id="custom-text-field" style="display:none;">
+                    <div class="form-group">
+                        <label>Shift Label</label>
+                        <input type="text" name="custom_text" id="edit-custom-text" placeholder="e.g. Training, Meeting, 6-2 BAR" maxlength="30">
+                        <p class="help-text" style="margin-top:4px;">This text will appear on the schedule cell</p>
                     </div>
                 </div>
                 
@@ -133,82 +156,6 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- New Schedule Modal -->
-<div id="newScheduleModal" class="modal">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h3>Create New Schedule</h3>
-            <button class="modal-close" onclick="closeNewScheduleModal()">&times;</button>
-        </div>
-        <form method="POST" action="{{ url_for('create_new_schedule') }}" id="newScheduleForm">
-            <div class="modal-body">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Start Week (Monday)</label>
-                        <input type="date" name="start_date" id="new-start-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Number of Weeks</label>
-                        <select name="num_weeks" id="new-num-weeks">
-                            <option value="1">1 Week</option>
-                            <option value="2">2 Weeks</option>
-                            <option value="4" selected>4 Weeks</option>
-                            <option value="8">8 Weeks</option>
-                            <option value="12">12 Weeks</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="copy_current" id="copy-current" checked>
-                        Copy current week's schedule as template (repeats each week)
-                    </label>
-                </div>
-
-                <div id="template-preview" class="template-preview">
-                    <h4>Template Preview (Current Week)</h4>
-                    <p class="help-text">This schedule will repeat for each selected week:</p>
-                    <table class="preview-table">
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th>MON</th>
-                                <th>TUE</th>
-                                <th>WED</th>
-                                <th>THU</th>
-                                <th>FRI</th>
-                                <th>SAT</th>
-                                <th>SUN</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for emp in schedule_data %}
-                            <tr>
-                                <td>{{ emp.name }}</td>
-                                {% for day_shift in emp.shifts %}
-                                <td class="{% if day_shift.display == 'OFF' %}off-cell{% elif day_shift.display == 'R/O' %}ro-cell{% elif day_shift.display %}shift-filled{% endif %}">
-                                    {{ day_shift.display or '-' }}
-                                </td>
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="warning-box">
-                    <strong>⚠️ Note:</strong> Creating a new schedule will overwrite any existing shifts in the selected date range.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeNewScheduleModal()">Cancel</button>
-                <button type="submit" class="btn btn-success">Create Schedule</button>
             </div>
         </form>
     </div>
@@ -265,6 +212,62 @@
     </div>
 </div>
 
+<!-- Shift Presets Modal -->
+<div id="presetsModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>🔁 Shift Presets</h3>
+            <button class="modal-close" onclick="closePresetsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="help-text">Set default shifts for employees that repeat every week. Click a cell to assign a preset shift, then <strong>Save Presets</strong>. Use <strong>Apply to Week</strong> to fill the current week from presets.</p>
+            <div class="presets-table-container">
+                <table class="schedule-table presets-table" id="presetsTable">
+                    <thead>
+                        <tr>
+                            <th class="name-col">Employee</th>
+                            <th>MON</th>
+                            <th>TUE</th>
+                            <th>WED</th>
+                            <th>THU</th>
+                            <th>FRI</th>
+                            <th>SAT</th>
+                            <th>SUN</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employees %}
+                        <tr data-emp-id="{{ emp.id }}" data-emp-name="{{ emp.name }}">
+                            <td class="name-col">{{ emp.name }}</td>
+                            {% for d in range(7) %}
+                            <td class="preset-cell" data-day="{{ d }}" onclick="cyclePreset(this)">
+                                <span class="preset-label">-</span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="preset-legend">
+                <span class="legend-item"><span class="preset-chip preset-opening">OP/BAR</span> Opening 5-1:30</span>
+                <span class="legend-item"><span class="preset-chip preset-mid">MID</span> 9:30-6</span>
+                <span class="legend-item"><span class="preset-chip preset-pm">PM</span> 12-8:30</span>
+                <span class="legend-item"><span class="preset-chip preset-closing">CL</span> 1-9:30</span>
+                <span class="legend-item"><span class="preset-chip preset-off">OFF</span></span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closePresetsModal()">Cancel</button>
+            <form method="POST" action="{{ url_for('apply_shift_presets') }}" style="display:inline;">
+                <input type="hidden" name="week_offset" value="{{ week_offset }}">
+                <button type="submit" class="btn btn-info" onclick="savePresetsBeforeApply(event)">Apply to Week</button>
+            </form>
+            <button type="button" class="btn btn-primary" onclick="savePresets()">Save Presets</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .schedule-page .page-header {
     display: flex;
@@ -276,8 +279,73 @@
 }
 
 .schedule-actions {
+    position: relative;
+}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 6px;
+}
+
+.dropdown-toggle::after {
+    content: '▾';
+    font-size: 0.75rem;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 6px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    min-width: 220px;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.dropdown-menu.open {
+    display: block;
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+    background: #f3f4f6;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 4px 0;
+}
+
+.dropdown-item-danger {
+    color: #dc2626;
+}
+
+.dropdown-item-danger:hover {
+    background: #fef2f2;
 }
 
 .btn-success {
@@ -457,6 +525,64 @@
     background: #0284c7;
 }
 
+.btn-preset {
+    background: #8b5cf6;
+    color: white;
+}
+
+.btn-preset:hover {
+    background: #7c3aed;
+}
+
+/* Presets Styles */
+.presets-table-container {
+    overflow-x: auto;
+    margin-bottom: 15px;
+}
+
+.preset-cell {
+    cursor: pointer;
+    min-width: 80px;
+    padding: 10px 6px !important;
+    transition: background 0.15s;
+    user-select: none;
+    color: #374151 !important;
+}
+
+.preset-cell:hover {
+    background: #e5e7eb !important;
+}
+
+.preset-cell[data-type="opening"] { background: #dbeafe !important; color: #1e40af !important; font-weight: 600; }
+.preset-cell[data-type="mid"] { background: #d1fae5 !important; color: #065f46 !important; font-weight: 600; }
+.preset-cell[data-type="pm"] { background: #fef3c7 !important; color: #92400e !important; font-weight: 600; }
+.preset-cell[data-type="closing"] { background: #e0e7ff !important; color: #3730a3 !important; font-weight: 600; }
+.preset-cell[data-type="off"] { background: #fee2e2 !important; color: #991b1b !important; font-weight: 600; }
+
+.preset-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+    font-size: 0.85rem;
+    align-items: center;
+}
+
+.preset-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-right: 4px;
+}
+
+.preset-opening { background: #dbeafe; color: #1e40af; }
+.preset-mid { background: #d1fae5; color: #065f46; }
+.preset-pm { background: #fef3c7; color: #92400e; }
+.preset-closing { background: #e0e7ff; color: #3730a3; }
+.preset-off { background: #fee2e2; color: #991b1b; }
+
 .ocr-info {
     background: #f0f9ff;
     border: 1px solid #0ea5e9;
@@ -570,6 +696,21 @@ input[type="file"]:hover {
 
 {% block scripts %}
 <script>
+// ========== Dropdown Menu ==========
+function toggleScheduleMenu() {
+    document.getElementById('scheduleDropdown').classList.toggle('open');
+}
+function closeScheduleMenu() {
+    document.getElementById('scheduleDropdown').classList.remove('open');
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const dropdown = document.querySelector('.dropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+        closeScheduleMenu();
+    }
+});
+
 // Preset shift times
 const SHIFT_PRESETS = {
     'opening': { start: '05:00', end: '13:30', station: 'BAR' },
@@ -590,6 +731,7 @@ function openEditShift(empId, empName, date, currentShift, shiftId) {
     document.getElementById('edit-start-time').value = '';
     document.getElementById('edit-end-time').value = '';
     document.getElementById('edit-station').value = '';
+    document.getElementById('edit-custom-text').value = '';
     
     // Set current values based on existing shift
     if (currentShift === 'OFF') {
@@ -608,6 +750,7 @@ function toggleShiftFields() {
     const shiftType = document.getElementById('edit-shift-type').value;
     const customFields = document.getElementById('custom-shift-fields');
     const stationField = document.getElementById('station-field');
+    const customTextField = document.getElementById('custom-text-field');
     
     // Handle preset shifts
     if (SHIFT_PRESETS[shiftType]) {
@@ -617,36 +760,25 @@ function toggleShiftFields() {
         document.getElementById('edit-station').value = preset.station;
         customFields.style.display = 'none';
         stationField.style.display = 'block';
+        customTextField.style.display = 'none';
     } else if (shiftType === 'custom') {
         customFields.style.display = 'block';
         stationField.style.display = 'block';
+        customTextField.style.display = 'none';
+    } else if (shiftType === 'custom_text') {
+        customFields.style.display = 'none';
+        stationField.style.display = 'none';
+        customTextField.style.display = 'block';
     } else {
         // off, ro, clear
         customFields.style.display = 'none';
         stationField.style.display = 'none';
+        customTextField.style.display = 'none';
     }
 }
 
 function closeModal() {
     document.getElementById('editShiftModal').classList.remove('active');
-}
-
-function openNewScheduleModal() {
-    // Set default date to next Monday
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-    const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + daysUntilMonday);
-    
-    const dateStr = nextMonday.toISOString().split('T')[0];
-    document.getElementById('new-start-date').value = dateStr;
-    
-    document.getElementById('newScheduleModal').classList.add('active');
-}
-
-function closeNewScheduleModal() {
-    document.getElementById('newScheduleModal').classList.remove('active');
 }
 
 // OCR Functions
@@ -688,5 +820,102 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ========== Presets Logic ==========
+const PRESET_CYCLE = ['', 'opening', 'mid', 'pm', 'closing', 'off'];
+const PRESET_LABELS = {
+    '': '-',
+    'opening': 'OP/BAR',
+    'mid': 'MID',
+    'pm': 'PM',
+    'closing': 'CL',
+    'off': 'OFF'
+};
+
+function cyclePreset(cell) {
+    const current = cell.getAttribute('data-type') || '';
+    const idx = PRESET_CYCLE.indexOf(current);
+    const next = PRESET_CYCLE[(idx + 1) % PRESET_CYCLE.length];
+    cell.setAttribute('data-type', next);
+    cell.querySelector('.preset-label').textContent = PRESET_LABELS[next];
+}
+
+function openPresetsModal() {
+    document.getElementById('presetsModal').classList.add('active');
+    loadPresets();
+}
+
+function closePresetsModal() {
+    document.getElementById('presetsModal').classList.remove('active');
+}
+
+function loadPresets() {
+    fetch('{{ url_for("get_shift_presets") }}')
+        .then(r => r.json())
+        .then(presets => {
+            const rows = document.querySelectorAll('#presetsTable tbody tr');
+            rows.forEach(row => {
+                const empId = row.getAttribute('data-emp-id');
+                const cells = row.querySelectorAll('.preset-cell');
+                cells.forEach(cell => {
+                    const day = cell.getAttribute('data-day');
+                    const preset = (presets[empId] && presets[empId][day]) || {};
+                    const type = preset.shift_type || '';
+                    cell.setAttribute('data-type', type);
+                    cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
+                });
+            });
+        });
+}
+
+function gatherPresetsData() {
+    const presets = {};
+    const rows = document.querySelectorAll('#presetsTable tbody tr');
+    rows.forEach(row => {
+        const empId = row.getAttribute('data-emp-id');
+        const cells = row.querySelectorAll('.preset-cell');
+        const empPresets = {};
+        let hasAny = false;
+        cells.forEach(cell => {
+            const day = cell.getAttribute('data-day');
+            const type = cell.getAttribute('data-type') || '';
+            if (type) {
+                empPresets[day] = { shift_type: type, station: '' };
+                hasAny = true;
+            }
+        });
+        if (hasAny) {
+            presets[empId] = empPresets;
+        }
+    });
+    return presets;
+}
+
+function savePresets() {
+    const presets = gatherPresetsData();
+    fetch('{{ url_for("save_shift_presets") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(presets)
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            alert('Presets saved!');
+        }
+    });
+}
+
+function savePresetsBeforeApply(event) {
+    event.preventDefault();
+    const presets = gatherPresetsData();
+    fetch('{{ url_for("save_shift_presets") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(presets)
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            event.target.closest('form').submit();
+        }
+    });
+}
 </script>
 {% endblock %}

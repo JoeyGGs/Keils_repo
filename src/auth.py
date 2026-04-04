@@ -12,7 +12,7 @@ ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "6wtUzguuYNwQ_bMabqpd"
 
 # Available roles after admin login
-ADMIN_ROLES = ["Joey", "Michael"]
+ADMIN_ROLES = ["Michael", "Steve", "Joey"]
 
 
 class AuthManager:
@@ -49,7 +49,7 @@ class AuthManager:
             return {
                 'id': f'ROLE_{role.upper()}',
                 'name': role,
-                'role': 'manager',  # Both Joey and Michael have manager access
+                'role': 'manager',  # Joey, Michael, and Steve have manager access
                 'display_role': role
             }
         return None

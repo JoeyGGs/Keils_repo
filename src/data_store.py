@@ -29,6 +29,7 @@ class DataStore:
         self.inventory_file = self.data_dir / "inventory.json"
         self.usage_file = self.data_dir / "usage_log.json"
         self.inventory_counts_file = self.data_dir / "inventory_counts.json"
+        self.shift_presets_file = self.data_dir / "shift_presets.json"
     
     # ========== Employee Operations ==========
     
@@ -95,6 +96,7 @@ class DataStore:
                 'station': shift.station,
                 'is_off': shift.is_off,
                 'is_request_off': shift.is_request_off,
+                'custom_text': shift.custom_text,
                 'notes': shift.notes
             }
             data.append(shift_dict)
@@ -117,6 +119,7 @@ class DataStore:
                 station=shift_dict.get('station', ''),
                 is_off=shift_dict.get('is_off', False),
                 is_request_off=shift_dict.get('is_request_off', False),
+                custom_text=shift_dict.get('custom_text', ''),
                 notes=shift_dict.get('notes', '')
             )
             shifts.append(shift)
@@ -283,6 +286,19 @@ class DataStore:
         
         return counts
     
+    # ========== Shift Presets Operations ==========
+
+    def save_shift_presets(self, presets: dict):
+        """Save shift presets to JSON file. Format: {employee_id: {day_index: {shift_type, station}}}"""
+        self._write_json(self.shift_presets_file, presets)
+
+    def load_shift_presets(self) -> dict:
+        """Load shift presets from JSON file"""
+        data = self._read_json(self.shift_presets_file)
+        if isinstance(data, list):
+            return {}
+        return data if data else {}
+
     # ========== Helper Methods ==========
     
     def _write_json(self, filepath: Path, data: list):

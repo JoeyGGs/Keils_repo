@@ -52,6 +52,7 @@ class Shift:
     station: str = ""  # BAR, MID, OP, CK, FR, MEAT, PM
     is_off: bool = False  # OFF day
     is_request_off: bool = False  # R/O
+    custom_text: str = ""  # Free-form shift label
     notes: str = ""
     
     @property
@@ -61,6 +62,8 @@ class Shift:
             return "OFF"
         if self.is_request_off:
             return "R/O"
+        if self.custom_text:
+            return self.custom_text
         if self.start_time and self.end_time:
             start_str = self._format_time(self.start_time)
             end_str = self._format_time(self.end_time)
