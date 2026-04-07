@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order — {{ vendor.name }} — {{ order.id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 30px; color: #000; background: #fff; font-size: 14px; }
+        .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #000; padding-bottom: 16px; }
+        .header h1 { font-size: 20px; margin-bottom: 4px; }
+        .header h2 { font-size: 16px; font-weight: normal; color: #555; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
+        .meta-group { }
+        .meta-group strong { display: block; margin-bottom: 2px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
+        th { background: #f0f0f0; font-weight: bold; font-size: 12px; text-transform: uppercase; }
+        td { font-size: 13px; }
+        .text-right { text-align: right; }
+        tfoot td { font-weight: bold; background: #fafafa; }
+        .notes { margin-top: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 4px; }
+        .notes strong { display: block; margin-bottom: 4px; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #888; }
+        @media print {
+            body { padding: 15px; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 10px 30px; font-size: 16px; cursor: pointer;">🖨️ Print Order</button>
+        <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">Close</button>
+    </div>
+
+    <div class="header">
+        <h1>Keil's Service Deli — Purchase Order</h1>
+        <h2>{{ vendor.name }}</h2>
+    </div>
+
+    <div class="meta">
+        <div class="meta-group">
+            <strong>Order #: {{ order.id }}</strong>
+            {% if order.po_number %}PO: {{ order.po_number }}{% endif %}
+        </div>
+        <div class="meta-group">
+            <strong>Date: {{ order.submitted_at.strftime('%m/%d/%Y') if order.submitted_at else order.created_at.strftime('%m/%d/%Y') }}</strong>
+            Status: {{ order.status|capitalize }}
+        </div>
+        <div class="meta-group">
+            {% if vendor.phone %}<strong>Vendor Phone:</strong> {{ vendor.phone }}<br>{% endif %}
+            {% if vendor.email %}<strong>Vendor Email:</strong> {{ vendor.email }}{% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>SKU</th>
+                <th class="text-right">Qty</th>
+                <th>Unit</th>
+                <th class="text-right">Unit Cost</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in order.items %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.product_name }}</td>
+                <td>{{ item.sku }}</td>
+                <td class="text-right">{{ item.quantity }}</td>
+                <td>{{ item.unit }}</td>
+                <td class="text-right">${{ "%.2f"|format(item.cost) }}</td>
+                <td class="text-right">${{ "%.2f"|format(item.total_cost) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3">Total</td>
+                <td class="text-right">{{ order.total_items }}</td>
+                <td colspan="2"></td>
+                <td class="text-right">${{ "%.2f"|format(order.total_cost) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    {% if order.notes %}
+    <div class="notes">
+        <strong>Notes:</strong>
+        {{ order.notes }}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Keil's Service Deli — Generated {{ order.created_at.strftime('%m/%d/%Y %I:%M %p') }}
+    </div>
+</body>
+</html>

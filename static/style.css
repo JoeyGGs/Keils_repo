@@ -792,7 +792,49 @@ body {
 }
 
 /* KeHE Ordering */
-.kehe-page .page-header p {
+.kehe-subtab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-dark);
+    background: var(--bg-card);
+    border-radius: 8px 8px 0 0;
+    padding: 0 8px;
+}
+
+.kehe-subtab-btn {
+    background: transparent;
+    border: none;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.kehe-subtab-btn:hover {
+    color: var(--primary);
+    background: var(--bg-hover);
+}
+
+.kehe-subtab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.kehe-subtab-content {
+    display: none;
+}
+
+.kehe-subtab-content.active {
+    display: block;
+}
+
+.kehe-page .page-header p,
+.kehe-order-section .page-header p {
     color: var(--text-muted);
     margin-top: 5px;
 }
@@ -1436,6 +1478,19 @@ body {
     }
 
     /* --- KeHE --- */
+    .kehe-subtab-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+    }
+
+    .kehe-subtab-btn {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
     .qty-input {
         min-height: 44px;
         font-size: 16px;
@@ -1848,6 +1903,135 @@ body {
     background: rgba(6, 182, 212, 0.3);
 }
 
+/* ============ Ordering Interface ============ */
+.ordering-page .page-header p {
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.vendor-selector {
+    margin-top: 16px;
+}
+
+.vendor-cards {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.vendor-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    min-width: 200px;
+    cursor: pointer;
+}
+
+.vendor-card:hover {
+    border-color: var(--primary);
+    background: rgba(239, 68, 68, 0.05);
+    transform: translateY(-1px);
+}
+
+.vendor-card.active {
+    border-color: var(--primary);
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.vendor-card-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.vendor-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vendor-card-info strong {
+    font-size: 1rem;
+}
+
+.vendor-type-badge {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 1px 8px;
+    border-radius: 4px;
+    width: fit-content;
+}
+
+.empty-state-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.empty-state-box a {
+    color: var(--primary);
+}
+
+@media (max-width: 768px) {
+    .vendor-cards {
+        flex-direction: column;
+    }
+    
+    .vendor-card {
+        min-width: unset;
+    }
+}
+
+/* Checkbox group for forms */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.vendor-ordering-toggle {
+    margin: 10px 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+/* Vendor Webview */
+.vendor-webview-frame {
+    width: 100%;
+    height: calc(100vh - 220px);
+    min-height: 600px;
+    border: none;
+    border-radius: 0 0 10px 10px;
+    background: #fff;
+}
+
 .btn-success {
     background: rgba(16, 185, 129, 0.2);
     color: #10b981;
@@ -1899,5 +2083,223 @@ body {
     .card {
         box-shadow: none;
         border: none;
+    }
+}
+
+/* ============ Vendor Catalog Ordering ============ */
+
+.catalog-page .tab-nav {
+    margin-bottom: 0;
+}
+
+.catalog-product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.catalog-product-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    transition: border-color 0.2s;
+}
+
+.catalog-product-card:hover {
+    border-color: var(--primary);
+}
+
+.catalog-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.catalog-product-info strong {
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-sku {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.product-detail {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.product-cost {
+    font-size: 0.85rem;
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.catalog-add-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+.qty-input {
+    width: 60px !important;
+    text-align: center;
+    padding: 6px 4px !important;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+@media (max-width: 600px) {
+    .catalog-product-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+/* ============ Invoices Page ============ */
+
+.invoices-page .page-description {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}
+
+.invoice-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stat-card .stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Invoice Review */
+
+.invoice-review-page .invoice-header-cards {
+    margin-bottom: 20px;
+}
+
+.invoice-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.meta-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.meta-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.invoice-items-table tr.matched {
+    border-left: 3px solid #22c55e;
+}
+
+.match-badge {
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.match-badge.matched {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.match-badge.unmatched {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--text-secondary);
+}
+
+.invoice-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    align-items: center;
+}
+
+.ocr-text {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    color: var(--text-secondary);
+}
+
+.text-success { color: #22c55e !important; }
+.text-warning { color: #f59e0b !important; }
+.text-danger { color: #ef4444 !important; }
+
+@media (max-width: 600px) {
+    .invoice-stats {
+        flex-direction: column;
+    }
+    .invoice-meta {
+        gap: 12px;
+    }
+    .invoice-actions {
+        flex-direction: column;
     }
 }

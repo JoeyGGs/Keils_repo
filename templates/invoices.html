@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="invoices-page">
+    <div class="page-header">
+        <h2>🧾 Invoices</h2>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="document.getElementById('uploadModal').classList.add('active')">📤 Upload Invoice</button>
+            <button class="btn btn-outline" onclick="document.getElementById('manualModal').classList.add('active')">📝 Paste Text</button>
+        </div>
+    </div>
+
+    <p class="page-description">Upload vendor invoices to automatically update item prices. OCR extracts line items and matches them to your inventory.</p>
+
+    {% if not tesseract_available %}
+    <div class="alert alert-warning">
+        ⚠️ Tesseract OCR is not installed — image uploads won't work. You can still paste invoice text manually.
+        <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank">Install Tesseract</a>
+    </div>
+    {% endif %}
+
+    <!-- Invoice Stats -->
+    {% if invoices %}
+    <div class="invoice-stats">
+        <div class="stat-card">
+            <span class="stat-number">{{ invoices|length }}</span>
+            <span class="stat-label">Total Invoices</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-number">{{ invoices|selectattr('status', 'equalto', 'pending')|list|length }}</span>
+            <span class="stat-label">Pending Review</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-number">{{ invoices|selectattr('status', 'equalto', 'applied')|list|length }}</span>
+            <span class="stat-label">Applied</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Invoice List -->
+    {% if invoices %}
+    <div class="card">
+        <div class="card-body" style="padding: 0;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Vendor</th>
+                        <th>Invoice #</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td>{{ inv.uploaded_at.strftime('%m/%d/%Y') }}</td>
+                        <td><strong>{{ inv.vendor_name or 'Unknown' }}</strong></td>
+                        <td>{{ inv.invoice_number or '—' }}</td>
+                        <td>{{ inv.item_count }} items</td>
+                        <td>${{ "%.2f"|format(inv.total) }}</td>
+                        <td>
+                            {% if inv.status == 'pending' %}
+                            <span class="badge badge-warning">Pending</span>
+                            {% elif inv.status == 'reviewed' %}
+                            <span class="badge" style="background: #3b82f6">Reviewed</span>
+                            {% elif inv.status == 'applied' %}
+                            <span class="badge badge-success">Applied</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('review_invoice', invoice_id=inv.id) }}" class="btn btn-xs btn-primary">Review</a>
+                            <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline" onsubmit="return confirm('Delete this invoice?')">
+                                <button type="submit" class="btn btn-xs btn-danger">×</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: 3rem;">
+            <div style="font-size: 3rem; margin-bottom: 12px;">🧾</div>
+            <h3>No invoices yet</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload a vendor invoice image or paste invoice text to get started.<br>Prices will be automatically extracted and matched to your inventory.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('uploadModal').classList.add('active')">📤 Upload Your First Invoice</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Invoice Modal -->
+<div class="modal" id="uploadModal">
+    <div class="modal-content">
+        <form method="POST" action="{{ url_for('upload_invoice') }}" enctype="multipart/form-data">
+            <div class="modal-header">
+                <h3>📤 Upload Invoice</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('uploadModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Vendor</label>
+                    <select name="vendor_name" class="form-control">
+                        <option value="">-- Select Vendor --</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Invoice Image *</label>
+                    <input type="file" name="invoice_file" accept="image/*,.pdf" required class="form-control">
+                    <small>Upload a photo or scan of the invoice — OCR will extract items and prices</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('uploadModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Upload & Parse</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div class="modal" id="manualModal">
+    <div class="modal-content" style="max-width: 700px;">
+        <form method="POST" action="{{ url_for('manual_invoice') }}">
+            <div class="modal-header">
+                <h3>📝 Paste Invoice Text</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('manualModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Vendor</label>
+                        <select name="vendor_name" class="form-control">
+                            <option value="">-- Select Vendor --</option>
+                            {% for vendor in vendors %}
+                            <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Invoice #</label>
+                        <input type="text" name="invoice_number" class="form-control" placeholder="Optional">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Invoice Text *</label>
+                    <textarea name="raw_text" class="form-control" rows="12" required placeholder="Paste the invoice text here...&#10;&#10;Example:&#10;Turkey Breast  2 CS  $45.99  $91.98&#10;Swiss Cheese   1 CS  $38.50  $38.50&#10;Rye Bread      3 EA  $4.25   $12.75"></textarea>
+                    <small>Paste the line items from your invoice. The parser will extract product names, quantities, and prices.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('manualModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Parse Invoice</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

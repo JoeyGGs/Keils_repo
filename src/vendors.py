@@ -18,6 +18,9 @@ class Vendor:
     email: str = ""
     categories: List[str] = field(default_factory=list)  # Item categories they supply
     notes: str = ""
+    ordering_enabled: bool = False  # Can order through the dashboard
+    ordering_type: str = "standard"  # 'standard', 'kehe', 'catalog', or 'webview'
+    website_url: str = ""  # URL for webview ordering type
     
 
 # Default vendors for Keil's Service Deli
@@ -67,12 +70,39 @@ DEFAULT_VENDORS = [
         categories=["SUPPLIES", "CONDIMENTS"],
         notes="Supplies and bulk items"
     ),
+    Vendor(
+        id="V006",
+        name="KeHE",
+        contact_name="",
+        phone="",
+        email="",
+        categories=["MEATS", "CHEESES", "CONDIMENTS", "SUPPLIES", "BREADS", "SALADS"],
+        notes="KeHE CONNECT distributor",
+        ordering_enabled=True,
+        ordering_type="kehe"
+    ),
+    Vendor(
+        id="V007",
+        name="All American Plastics",
+        contact_name="",
+        phone="",
+        email="",
+        categories=["SUPPLIES"],
+        notes="Packaging and plastic supplies",
+        ordering_enabled=True,
+        ordering_type="catalog",
+        website_url="https://www.aaplastic.com"
+    ),
 ]
 
 
 class VendorManager:
     def __init__(self):
         self.data_file = Path(__file__).parent.parent / "data" / "vendors.json"
+        self.vendors = self._load_vendors()
+    
+    def _reload(self):
+        """Reload vendors from disk to pick up any changes"""
         self.vendors = self._load_vendors()
     
     def _load_vendors(self) -> Dict[str, Vendor]:
@@ -89,7 +119,10 @@ class VendorManager:
                             phone=v.get('phone', ''),
                             email=v.get('email', ''),
                             categories=v.get('categories', []),
-                            notes=v.get('notes', '')
+                            notes=v.get('notes', ''),
+                            ordering_enabled=v.get('ordering_enabled', False),
+                            ordering_type=v.get('ordering_type', 'standard'),
+                            website_url=v.get('website_url', '')
                         )
                         for v in data
                     }
@@ -114,7 +147,10 @@ class VendorManager:
                 'phone': v.phone,
                 'email': v.email,
                 'categories': v.categories,
-                'notes': v.notes
+                'notes': v.notes,
+                'ordering_enabled': v.ordering_enabled,
+                'ordering_type': v.ordering_type,
+                'website_url': v.website_url
             }
             for v in vendors.values()
         ]
@@ -124,13 +160,21 @@ class VendorManager:
             json.dump(data, f, indent=2, ensure_ascii=False)
     
     def get_all_vendors(self) -> List[Vendor]:
+        self._reload()
         return list(self.vendors.values())
     
     def get_vendor(self, vendor_id: str) -> Vendor:
+        self._reload()
         return self.vendors.get(vendor_id)
     
     def get_vendors_by_category(self, category: str) -> List[Vendor]:
+        self._reload()
         return [v for v in self.vendors.values() if category.upper() in v.categories]
+    
+    def get_ordering_vendors(self) -> List[Vendor]:
+        """Get vendors that have ordering enabled through the dashboard"""
+        self._reload()
+        return [v for v in self.vendors.values() if v.ordering_enabled]
     
     def add_vendor(self, vendor: Vendor):
         self.vendors[vendor.id] = vendor

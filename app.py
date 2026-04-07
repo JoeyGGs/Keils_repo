@@ -16,6 +16,8 @@ from src.vendors import VendorManager
 from src.order_sheet import OrderSheetGenerator
 from src.ocr_parser import ScheduleOCRParser, is_tesseract_available
 from src.kehe import KeHEManager, KeHEProduct
+from src.vendor_orders import VendorOrderManager, VendorProduct
+from src.invoices import InvoiceManager, InvoiceOCRParser, Invoice, InvoiceLineItem
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.urandom(24)
@@ -25,6 +27,9 @@ auth_manager = AuthManager()
 data_store = DataStore()
 vendor_manager = VendorManager()
 kehe_manager = KeHEManager()
+vendor_order_manager = VendorOrderManager()
+invoice_manager = InvoiceManager()
+invoice_parser = InvoiceOCRParser()
 
 
 def login_required(f):
@@ -394,7 +399,7 @@ def create_new_schedule():
 
     presets = data_store.load_shift_presets()
     if not presets:
-        flash('No presets saved yet — set up presets first', 'error')
+        flash('No presets saved yet â€” set up presets first', 'error')
         return redirect(url_for('schedule', week=view_offset))
 
     employees = data_store.load_employees()
@@ -791,6 +796,9 @@ def orders_inventory():
         from dateutil.relativedelta import relativedelta
         next_count_due = last_count.count_date + relativedelta(months=6)
     
+    # Load ordering vendors for the Ordering tab
+    ordering_vendors = vendor_manager.get_ordering_vendors()
+    
     return render_template('orders_inventory.html',
                          items=items,
                          by_category=by_category,
@@ -803,6 +811,7 @@ def orders_inventory():
                          completed_counts=completed_counts,
                          last_count=last_count,
                          next_count_due=next_count_due,
+                         ordering_vendors=ordering_vendors,
                          today=date.today())
 
 
@@ -1099,19 +1108,55 @@ def vendors():
     return redirect(url_for('orders_inventory'))
 
 
+@app.route('/vendors/add', methods=['POST'])
+@manager_required
+def add_vendor():
+    from src.vendors import Vendor
+    # Generate next vendor ID
+    existing_ids = [v.id for v in vendor_manager.get_all_vendors()]
+    next_num = 1
+    while f'V{next_num:03d}' in existing_ids:
+        next_num += 1
+    vendor_id = f'V{next_num:03d}'
+    
+    categories = request.form.getlist('categories')
+    
+    vendor = Vendor(
+        id=vendor_id,
+        name=request.form.get('name', '').strip(),
+        contact_name=request.form.get('contact_name', '').strip(),
+        phone=request.form.get('phone', '').strip(),
+        email=request.form.get('email', '').strip(),
+        categories=categories,
+        notes=request.form.get('notes', '').strip(),
+        website_url=request.form.get('website_url', '').strip(),
+        ordering_type='webview' if request.form.get('website_url', '').strip() else 'standard',
+    )
+    vendor_manager.add_vendor(vendor)
+    flash(f'Vendor "{vendor.name}" added', 'success')
+    return redirect(url_for('orders_inventory') + '?tab=vendors')
+
+
 @app.route('/vendors/update/<vendor_id>', methods=['POST'])
 @manager_required
 def update_vendor(vendor_id):
-    vendor_manager.update_vendor(
-        vendor_id,
+    categories = request.form.getlist('categories')
+    website_url = request.form.get('website_url', '').strip()
+    update_kwargs = dict(
         name=request.form.get('name', ''),
         contact_name=request.form.get('contact_name', ''),
         phone=request.form.get('phone', ''),
         email=request.form.get('email', ''),
-        notes=request.form.get('notes', '')
+        categories=categories,
+        notes=request.form.get('notes', ''),
+        website_url=website_url,
     )
+    # Auto-set ordering_type to webview if a URL is provided
+    if website_url:
+        update_kwargs['ordering_type'] = 'webview'
+    vendor_manager.update_vendor(vendor_id, **update_kwargs)
     flash('Vendor updated', 'success')
-    return redirect(url_for('orders_inventory'))
+    return redirect(url_for('orders_inventory') + '?tab=vendors')
 
 
 @app.route('/vendors/delete/<vendor_id>', methods=['POST'])
@@ -1192,52 +1237,475 @@ def api_low_stock():
     } for i in low])
 
 
+# ============ Invoice Routes ============
+
+@app.route('/invoices')
+@login_required
+def invoices_page():
+    """Invoice management with OCR"""
+    invoices = invoice_manager.load_invoices()
+    vendors = vendor_manager.get_all_vendors()
+    # Sort newest first
+    invoices.sort(key=lambda x: x.uploaded_at, reverse=True)
+    return render_template('invoices.html',
+                         invoices=invoices,
+                         vendors=vendors,
+                         tesseract_available=is_tesseract_available())
+
+
+@app.route('/invoices/upload', methods=['POST'])
+@login_required
+def upload_invoice():
+    """Upload and OCR-parse an invoice image"""
+    vendor_name = request.form.get('vendor_name', '')
+    
+    if 'invoice_file' not in request.files:
+        flash('No file uploaded', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    file = request.files['invoice_file']
+    if file.filename == '':
+        flash('No file selected', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    try:
+        image_data = file.read()
+        
+        # OCR the invoice
+        raw_text = invoice_parser.extract_text(image_data)
+        
+        # Parse the text into an invoice
+        invoice = invoice_parser.parse_invoice_text(raw_text, vendor_name)
+        
+        # Try to match line items to inventory
+        inventory_items = data_store.load_inventory()
+        invoice = invoice_parser.match_to_inventory(invoice, inventory_items)
+        
+        # Save
+        invoice_manager.add_invoice(invoice)
+        
+        flash(f'Invoice parsed: {invoice.item_count} items found, {invoice.matched_count} matched to inventory', 'success')
+        return redirect(url_for('review_invoice', invoice_id=invoice.id))
+    
+    except Exception as e:
+        flash(f'Error processing invoice: {str(e)}', 'error')
+        return redirect(url_for('invoices_page'))
+
+
+@app.route('/invoices/manual', methods=['POST'])
+@login_required
+def manual_invoice():
+    """Manually create an invoice entry (paste text or enter items)"""
+    vendor_name = request.form.get('vendor_name', '')
+    raw_text = request.form.get('raw_text', '')
+    invoice_number = request.form.get('invoice_number', '')
+    
+    if raw_text:
+        invoice = invoice_parser.parse_invoice_text(raw_text, vendor_name)
+    else:
+        import uuid
+        invoice = Invoice(
+            id=str(uuid.uuid4())[:8].upper(),
+            vendor_name=vendor_name,
+        )
+    
+    invoice.invoice_number = invoice_number
+    
+    # Try to match
+    inventory_items = data_store.load_inventory()
+    invoice = invoice_parser.match_to_inventory(invoice, inventory_items)
+    
+    invoice_manager.add_invoice(invoice)
+    flash(f'Invoice created: {invoice.item_count} items parsed', 'success')
+    return redirect(url_for('review_invoice', invoice_id=invoice.id))
+
+
+@app.route('/invoices/<invoice_id>')
+@login_required
+def review_invoice(invoice_id):
+    """Review and edit a parsed invoice before applying"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    inventory_items = data_store.load_inventory()
+    vendors = vendor_manager.get_all_vendors()
+    
+    return render_template('invoice_review.html',
+                         invoice=invoice,
+                         inventory_items=inventory_items,
+                         vendors=vendors)
+
+
+@app.route('/invoices/<invoice_id>/match', methods=['POST'])
+@login_required
+def update_invoice_match(invoice_id):
+    """Update a line item's inventory match"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    line_index = int(request.form.get('line_index', -1))
+    inventory_id = request.form.get('inventory_id', '')
+    
+    if 0 <= line_index < len(invoice.line_items):
+        if inventory_id:
+            inventory_items = data_store.load_inventory()
+            matched = next((i for i in inventory_items if i.id == inventory_id), None)
+            if matched:
+                invoice.line_items[line_index].matched_inventory_id = matched.id
+                invoice.line_items[line_index].matched_inventory_name = matched.name
+        else:
+            invoice.line_items[line_index].matched_inventory_id = ''
+            invoice.line_items[line_index].matched_inventory_name = ''
+        
+        invoice_manager.update_invoice(invoice)
+        flash('Match updated', 'success')
+    
+    return redirect(url_for('review_invoice', invoice_id=invoice_id))
+
+
+@app.route('/invoices/<invoice_id>/edit-item', methods=['POST'])
+@login_required
+def edit_invoice_item(invoice_id):
+    """Edit a line item's price or quantity"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    line_index = int(request.form.get('line_index', -1))
+    
+    if 0 <= line_index < len(invoice.line_items):
+        item = invoice.line_items[line_index]
+        item.description = request.form.get('description', item.description)
+        item.quantity = float(request.form.get('quantity', item.quantity) or 0)
+        item.unit_price = float(request.form.get('unit_price', item.unit_price) or 0)
+        item.total_price = float(request.form.get('total_price', item.total_price) or 0)
+        item.unit = request.form.get('unit', item.unit)
+        
+        invoice_manager.update_invoice(invoice)
+        flash('Item updated', 'success')
+    
+    return redirect(url_for('review_invoice', invoice_id=invoice_id))
+
+
+@app.route('/invoices/<invoice_id>/apply', methods=['POST'])
+@login_required
+def apply_invoice(invoice_id):
+    """Apply invoice prices to inventory items"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    
+    inventory_items = data_store.load_inventory()
+    items_by_id = {item.id: item for item in inventory_items}
+    
+    updates_applied = []
+    
+    for line_item in invoice.line_items:
+        if not line_item.matched_inventory_id:
+            continue
+        
+        inv_item = items_by_id.get(line_item.matched_inventory_id)
+        if not inv_item:
+            continue
+        
+        old_price = inv_item.cost_per_unit
+        new_price = line_item.unit_price
+        
+        if new_price > 0 and new_price != old_price:
+            inv_item.cost_per_unit = new_price
+            inv_item.last_updated = datetime.now()
+            
+            updates_applied.append({
+                'item_name': inv_item.name,
+                'item_id': inv_item.id,
+                'old_price': old_price,
+                'new_price': new_price,
+                'change': round(new_price - old_price, 2),
+                'change_pct': round(((new_price - old_price) / old_price * 100) if old_price > 0 else 0, 1),
+            })
+    
+    # Save updated inventory
+    data_store.save_inventory(inventory_items)
+    
+    # Mark invoice as applied
+    invoice.status = 'applied'
+    invoice.applied_updates = updates_applied
+    invoice_manager.update_invoice(invoice)
+    
+    flash(f'Invoice applied: {len(updates_applied)} prices updated', 'success')
+    return redirect(url_for('review_invoice', invoice_id=invoice_id))
+
+
+@app.route('/invoices/<invoice_id>/delete', methods=['POST'])
+@login_required
+def delete_invoice(invoice_id):
+    """Delete an invoice"""
+    invoice_manager.delete_invoice(invoice_id)
+    flash('Invoice deleted', 'success')
+    return redirect(url_for('invoices_page'))
+
+
+# ============ Ordering Interface Routes ============
+
+@app.route('/ordering')
+@login_required
+def ordering():
+    """Ordering interface - select a vendor to order from"""
+    ordering_vendors = vendor_manager.get_ordering_vendors()
+    selected_vendor_id = request.args.get('vendor', '')
+    
+    selected_vendor = None
+    vendor_data = {}
+    
+    if selected_vendor_id:
+        selected_vendor = vendor_manager.get_vendor(selected_vendor_id)
+    
+    if selected_vendor and selected_vendor.ordering_type == 'kehe':
+        # Load KeHE-specific data
+        config = kehe_manager.load_config()
+        warehouses = kehe_manager.get_warehouses()
+        products = kehe_manager.load_products()
+        orders = kehe_manager.load_orders()
+        draft_order = kehe_manager.get_draft_order()
+        inventory_items = data_store.load_inventory()
+        inventory_mapping = kehe_manager.load_inventory_mapping()
+        catalog_meta = kehe_manager.load_catalog_meta()
+        
+        search_query = request.args.get('search', '')
+        if search_query:
+            products = kehe_manager.search_products(search_query)
+        
+        low_stock_mapped = []
+        for item in inventory_items:
+            if item.is_low_stock:
+                kehe_sku = inventory_mapping.get(item.id)
+                if kehe_sku:
+                    kehe_product = kehe_manager.get_product(kehe_sku)
+                    if kehe_product:
+                        low_stock_mapped.append({
+                            'inventory_name': item.name,
+                            'current_qty': item.quantity,
+                            'unit': item.unit,
+                            'kehe_product': kehe_product
+                        })
+        
+        vendor_data = {
+            'config': config,
+            'warehouses': warehouses,
+            'products': products,
+            'orders': [o for o in orders if o.status != 'draft'],
+            'draft_order': draft_order,
+            'inventory_items': inventory_items,
+            'inventory_mapping': inventory_mapping,
+            'low_stock_mapped': low_stock_mapped,
+            'search_query': search_query,
+            'catalog_meta': catalog_meta,
+        }
+    elif selected_vendor and selected_vendor.ordering_type == 'catalog':
+        # Load catalog-based vendor ordering data
+        products = vendor_order_manager.load_products(selected_vendor_id)
+        draft_order = vendor_order_manager.get_draft_order(selected_vendor_id)
+        past_orders = vendor_order_manager.get_orders(selected_vendor_id)
+        
+        # Get unique categories for filter
+        categories = sorted(set(p.category for p in products if p.category))
+        
+        search_query = request.args.get('search', '')
+        if search_query:
+            products = vendor_order_manager.search_products(selected_vendor_id, search_query)
+        
+        vendor_data = {
+            'products': products,
+            'draft_order': draft_order,
+            'past_orders': past_orders,
+            'categories': categories,
+            'search_query': search_query,
+        }
+    elif selected_vendor and selected_vendor.ordering_type == 'standard':
+        # Load standard vendor order data
+        items = data_store.load_inventory()
+        from src.order_sheet import OrderSheetGenerator
+        generator = OrderSheetGenerator(items)
+        order = generator.generate_order_by_vendor(selected_vendor_id)
+        vendor_data = {
+            'order': order,
+            'items': items,
+        }
+    
+    return render_template('ordering.html',
+                         ordering_vendors=ordering_vendors,
+                         selected_vendor=selected_vendor,
+                         vendor_data=vendor_data)
+
+
+@app.route('/ordering/toggle/<vendor_id>', methods=['POST'])
+@login_required
+def toggle_vendor_ordering(vendor_id):
+    """Enable or disable ordering for a vendor"""
+    vendor = vendor_manager.get_vendor(vendor_id)
+    if vendor:
+        vendor_manager.update_vendor(vendor_id, ordering_enabled=not vendor.ordering_enabled)
+        status = 'enabled' if not vendor.ordering_enabled else 'disabled'
+        flash(f'Ordering {status} for {vendor.name}', 'success')
+    return redirect(url_for('ordering'))
+
+
+# ============ Vendor Catalog Routes ============
+
+def _catalog_redirect(vendor_id, tab=None):
+    """Helper to build redirect URL back to the ordering page for a catalog vendor."""
+    params = {'vendor': vendor_id}
+    if tab:
+        params['tab'] = tab
+    return redirect(url_for('ordering', **params))
+
+
+@app.route('/vendor-catalog/<vendor_id>/product/add', methods=['POST'])
+@login_required
+def vendor_catalog_add_product(vendor_id):
+    """Add a product to a vendor's catalog"""
+    import uuid
+    product = VendorProduct(
+        id=str(uuid.uuid4())[:8].upper(),
+        vendor_id=vendor_id,
+        name=request.form.get('name', ''),
+        sku=request.form.get('sku', ''),
+        description=request.form.get('description', ''),
+        category=request.form.get('category', ''),
+        unit=request.form.get('unit', 'each'),
+        pack_size=request.form.get('pack_size', ''),
+        cost=float(request.form.get('cost', 0) or 0)
+    )
+    vendor_order_manager.add_product(product)
+    flash(f'Product "{product.name}" added to catalog', 'success')
+    return _catalog_redirect(vendor_id, tab='catalog')
+
+
+@app.route('/vendor-catalog/<vendor_id>/product/<product_id>/edit', methods=['POST'])
+@login_required
+def vendor_catalog_edit_product(vendor_id, product_id):
+    """Edit a product in a vendor's catalog"""
+    vendor_order_manager.update_product(product_id,
+        name=request.form.get('name', ''),
+        sku=request.form.get('sku', ''),
+        description=request.form.get('description', ''),
+        category=request.form.get('category', ''),
+        unit=request.form.get('unit', 'each'),
+        pack_size=request.form.get('pack_size', ''),
+        cost=float(request.form.get('cost', 0) or 0)
+    )
+    flash('Product updated', 'success')
+    return _catalog_redirect(vendor_id, tab='catalog')
+
+
+@app.route('/vendor-catalog/<vendor_id>/product/<product_id>/delete', methods=['POST'])
+@login_required
+def vendor_catalog_delete_product(vendor_id, product_id):
+    """Delete a product from vendor catalog"""
+    vendor_order_manager.delete_product(product_id)
+    flash('Product removed from catalog', 'success')
+    return _catalog_redirect(vendor_id, tab='catalog')
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/create', methods=['POST'])
+@login_required
+def vendor_catalog_create_order(vendor_id):
+    """Create a new draft order for a vendor"""
+    vendor = vendor_manager.get_vendor(vendor_id)
+    if vendor:
+        order = vendor_order_manager.create_order(vendor_id, vendor.name)
+        flash(f'Draft order created', 'success')
+    return _catalog_redirect(vendor_id)
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/add', methods=['POST'])
+@login_required
+def vendor_catalog_add_item(vendor_id, order_id):
+    """Add item to a vendor order"""
+    product_id = request.form.get('product_id', '')
+    quantity = int(request.form.get('quantity', 1))
+    product = vendor_order_manager.get_product(product_id)
+    if product:
+        vendor_order_manager.add_item_to_order(order_id, product, quantity)
+        flash(f'{product.name} added to order', 'success')
+    else:
+        flash('Product not found', 'error')
+    return _catalog_redirect(vendor_id)
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/remove/<product_id>', methods=['POST'])
+@login_required
+def vendor_catalog_remove_item(vendor_id, order_id, product_id):
+    """Remove item from vendor order"""
+    vendor_order_manager.remove_item_from_order(order_id, product_id)
+    flash('Item removed from order', 'success')
+    return _catalog_redirect(vendor_id)
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/submit', methods=['POST'])
+@login_required
+def vendor_catalog_submit_order(vendor_id, order_id):
+    """Submit a vendor order"""
+    po_number = request.form.get('po_number', '')
+    notes = request.form.get('notes', '')
+    vendor_order_manager.submit_order(order_id, po_number, notes)
+    flash('Order submitted!', 'success')
+    return _catalog_redirect(vendor_id, tab='history')
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/received', methods=['POST'])
+@login_required
+def vendor_catalog_received_order(vendor_id, order_id):
+    """Mark a vendor order as received"""
+    vendor_order_manager.mark_received(order_id)
+    flash('Order marked as received', 'success')
+    return _catalog_redirect(vendor_id, tab='history')
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/delete', methods=['POST'])
+@login_required
+def vendor_catalog_delete_order(vendor_id, order_id):
+    """Delete a vendor order"""
+    vendor_order_manager.delete_order(order_id)
+    flash('Order deleted', 'success')
+    return _catalog_redirect(vendor_id)
+
+
+@app.route('/vendor-catalog/<vendor_id>/order/<order_id>/print')
+@login_required
+def vendor_catalog_print_order(vendor_id, order_id):
+    """Print view for a vendor order"""
+    vendor = vendor_manager.get_vendor(vendor_id)
+    orders = vendor_order_manager._load_all_orders()
+    order = next((o for o in orders if o.id == order_id), None)
+    if not order:
+        flash('Order not found', 'error')
+        return _catalog_redirect(vendor_id)
+    return render_template('vendor_order_print.html', vendor=vendor, order=order)
+
+
 # ============ KeHE Routes ============
+
+def _kehe_redirect(tab=None):
+    """Helper to build redirect URL back to the ordering page for KeHE vendor."""
+    kehe_vendor = next((v for v in vendor_manager.get_all_vendors() if v.ordering_type == 'kehe'), None)
+    vendor_id = kehe_vendor.id if kehe_vendor else ''
+    params = {'vendor': vendor_id}
+    if tab:
+        params['tab'] = tab
+    return redirect(url_for('ordering', **params))
 
 @app.route('/kehe')
 @login_required
 def kehe():
-    """KeHE ordering page"""
-    config = kehe_manager.load_config()
-    warehouses = kehe_manager.get_warehouses()
-    products = kehe_manager.load_products()
-    orders = kehe_manager.load_orders()
-    draft_order = kehe_manager.get_draft_order()
-    inventory_items = data_store.load_inventory()
-    inventory_mapping = kehe_manager.load_inventory_mapping()
-    catalog_meta = kehe_manager.load_catalog_meta()
-    
-    # Search functionality
-    search_query = request.args.get('search', '')
-    if search_query:
-        products = kehe_manager.search_products(search_query)
-    
-    # Get low stock items that are mapped to KeHE
-    low_stock_mapped = []
-    for item in inventory_items:
-        if item.is_low_stock:
-            kehe_sku = inventory_mapping.get(item.id)
-            if kehe_sku:
-                kehe_product = kehe_manager.get_product(kehe_sku)
-                if kehe_product:
-                    low_stock_mapped.append({
-                        'inventory_name': item.name,
-                        'current_qty': item.quantity,
-                        'unit': item.unit,
-                        'kehe_product': kehe_product
-                    })
-    
-    return render_template('kehe.html',
-                         config=config,
-                         warehouses=warehouses,
-                         products=products,
-                         orders=[o for o in orders if o.status != 'draft'],
-                         draft_order=draft_order,
-                         inventory_items=inventory_items,
-                         inventory_mapping=inventory_mapping,
-                         low_stock_mapped=low_stock_mapped,
-                         search_query=search_query,
-                         catalog_meta=catalog_meta)
+    """KeHE ordering - redirect to unified ordering page"""
+    return _kehe_redirect()
 
 
 @app.route('/kehe/settings', methods=['POST'])
@@ -1253,7 +1721,7 @@ def kehe_save_settings():
     )
     kehe_manager.save_config(config)
     flash('KeHE settings saved', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/warehouse', methods=['POST'])
@@ -1264,7 +1732,7 @@ def kehe_select_warehouse():
     config.primary_warehouse = request.form.get('warehouse', '')
     kehe_manager.save_config(config)
     flash(f'Warehouse set to {config.primary_warehouse}', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/product/add', methods=['POST'])
@@ -1287,7 +1755,7 @@ def kehe_add_product():
     )
     kehe_manager.add_product(product)
     flash(f'Product {product.name} added to catalog', 'success')
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 @app.route('/kehe/order/create', methods=['POST'])
@@ -1301,11 +1769,11 @@ def kehe_create_order():
     
     if not warehouse:
         flash('Please select a warehouse first', 'error')
-        return redirect(url_for('kehe'))
+        return _kehe_redirect()
     
     order = kehe_manager.create_order(warehouse)
     flash(f'Order {order.id} created', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/order/<order_id>/add', methods=['POST'])
@@ -1320,7 +1788,7 @@ def kehe_add_item(order_id):
     else:
         flash('Failed to add item', 'error')
     
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/order/<order_id>/remove/<sku>', methods=['POST'])
@@ -1329,7 +1797,7 @@ def kehe_remove_item(order_id, sku):
     """Remove item from order"""
     kehe_manager.remove_item_from_order(order_id, sku)
     flash('Item removed', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/order/<order_id>/submit', methods=['POST'])
@@ -1339,7 +1807,7 @@ def kehe_submit_order(order_id):
     po_number = request.form.get('po_number', '')
     kehe_manager.update_order_status(order_id, 'submitted', po_number)
     flash('Order submitted! Download the CSV to upload to KeHE CONNECT.', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/order/<order_id>/delete', methods=['POST'])
@@ -1348,7 +1816,7 @@ def kehe_delete_order(order_id):
     """Delete draft order"""
     kehe_manager.delete_order(order_id)
     flash('Order deleted', 'success')
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/order/<order_id>/download')
@@ -1377,14 +1845,14 @@ def kehe_quick_add():
             draft_order = kehe_manager.create_order(config.primary_warehouse)
         else:
             flash('Please select a warehouse first', 'error')
-            return redirect(url_for('kehe'))
+            return _kehe_redirect()
     
     if kehe_manager.add_item_to_order(draft_order.id, sku, quantity):
         flash('Item added to order', 'success')
     else:
         flash('Failed to add item', 'error')
     
-    return redirect(url_for('kehe'))
+    return _kehe_redirect()
 
 
 @app.route('/kehe/map', methods=['POST'])
@@ -1398,7 +1866,7 @@ def kehe_map_inventory():
         kehe_manager.map_inventory_to_kehe(inventory_id, kehe_sku)
         flash('Inventory mapped to KeHE product', 'success')
     
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 @app.route('/kehe/catalog/refresh', methods=['POST'])
@@ -1407,7 +1875,7 @@ def kehe_refresh_catalog():
     """Refresh KeHE catalog"""
     result = kehe_manager.refresh_catalog()
     flash(f'Catalog refreshed: {result["total_products"]} products, {result["active_products"]} active', 'success')
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 @app.route('/kehe/catalog/import', methods=['POST'])
@@ -1416,12 +1884,12 @@ def kehe_import_csv():
     """Import KeHE catalog from CSV file"""
     if 'csv_file' not in request.files:
         flash('No file uploaded', 'error')
-        return redirect(url_for('kehe') + '?tab=products')
+        return _kehe_redirect(tab='products')
     
     file = request.files['csv_file']
     if file.filename == '':
         flash('No file selected', 'error')
-        return redirect(url_for('kehe') + '?tab=products')
+        return _kehe_redirect(tab='products')
     
     # Check if we should clear existing catalog
     if request.form.get('clear_existing'):
@@ -1436,7 +1904,7 @@ def kehe_import_csv():
             csv_content = file.read().decode('latin-1')
         except Exception as e:
             flash(f'Error reading file: {str(e)}', 'error')
-            return redirect(url_for('kehe') + '?tab=products')
+            return _kehe_redirect(tab='products')
     
     # Get warehouse preference
     warehouse = request.form.get('warehouse', '')
@@ -1450,7 +1918,7 @@ def kehe_import_csv():
         for error in result['errors'][:3]:  # Show first 3 errors
             flash(error, 'warning')
     
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 @app.route('/kehe/product/<sku>/stock', methods=['POST'])
@@ -1464,7 +1932,7 @@ def kehe_toggle_stock(sku):
     elif action == 'unavailable':
         kehe_manager.mark_product_unavailable(sku)
         flash('Product marked as out of stock', 'success')
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 @app.route('/kehe/product/<sku>/delete', methods=['POST'])
@@ -1473,7 +1941,7 @@ def kehe_delete_product(sku):
     """Delete product from catalog"""
     kehe_manager.delete_product(sku)
     flash('Product removed from catalog', 'success')
-    return redirect(url_for('kehe') + '?tab=products')
+    return _kehe_redirect(tab='products')
 
 
 if __name__ == '__main__':

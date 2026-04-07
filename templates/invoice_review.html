@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Review Invoice - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="invoice-review-page">
+    <div class="page-header">
+        <h2>🧾 Review Invoice</h2>
+        <div class="header-actions">
+            <a href="{{ url_for('invoices_page') }}" class="btn btn-outline">← Back to Invoices</a>
+            {% if invoice.status == 'applied' %}
+            <span class="badge badge-success" style="font-size: 0.9rem; padding: 8px 16px;">✓ Applied</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Invoice Header Info -->
+    <div class="invoice-header-cards">
+        <div class="card invoice-info-card">
+            <div class="card-body">
+                <div class="invoice-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Vendor</span>
+                        <span class="meta-value">{{ invoice.vendor_name or 'Unknown' }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Invoice #</span>
+                        <span class="meta-value">{{ invoice.invoice_number or '—' }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Date</span>
+                        <span class="meta-value">{{ invoice.invoice_date.strftime('%m/%d/%Y') if invoice.invoice_date else invoice.uploaded_at.strftime('%m/%d/%Y') }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Items</span>
+                        <span class="meta-value">{{ invoice.item_count }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Matched</span>
+                        <span class="meta-value {% if invoice.matched_count == invoice.item_count %}text-success{% elif invoice.matched_count > 0 %}text-warning{% else %}text-danger{% endif %}">{{ invoice.matched_count }} / {{ invoice.item_count }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Total</span>
+                        <span class="meta-value">${{ "%.2f"|format(invoice.total) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Applied Updates Summary -->
+    {% if invoice.status == 'applied' and invoice.applied_updates %}
+    <div class="card" style="border-left: 3px solid #22c55e;">
+        <div class="card-header">
+            <h3>✓ Price Updates Applied</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Old Price</th>
+                        <th>New Price</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for update in invoice.applied_updates %}
+                    <tr>
+                        <td><strong>{{ update.item_name }}</strong></td>
+                        <td>${{ "%.2f"|format(update.old_price) }}</td>
+                        <td>${{ "%.2f"|format(update.new_price) }}</td>
+                        <td>
+                            {% if update.change > 0 %}
+                            <span class="text-danger">+${{ "%.2f"|format(update.change) }} ({{ update.change_pct }}%↑)</span>
+                            {% elif update.change < 0 %}
+                            <span class="text-success">${{ "%.2f"|format(update.change) }} ({{ update.change_pct }}%↓)</span>
+                            {% else %}
+                            No change
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Line Items -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Line Items</h3>
+            {% if invoice.status != 'applied' %}
+            <span style="color: var(--text-secondary); font-size: 0.85rem;">Match items to inventory, then apply to update prices</span>
+            {% endif %}
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="table invoice-items-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Description</th>
+                        <th>Qty</th>
+                        <th>Unit</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                        <th>Matched To</th>
+                        {% if invoice.status != 'applied' %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoice.line_items %}
+                    <tr class="{% if item.matched_inventory_id %}matched{% endif %}">
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ item.description }}</strong></td>
+                        <td>{{ "%.1f"|format(item.quantity) }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td>${{ "%.2f"|format(item.unit_price) }}</td>
+                        <td>${{ "%.2f"|format(item.total_price) }}</td>
+                        <td>
+                            {% if item.matched_inventory_id %}
+                            <span class="match-badge matched">✓ {{ item.matched_inventory_name }}</span>
+                            {% else %}
+                            <span class="match-badge unmatched">Not matched</span>
+                            {% endif %}
+                        </td>
+                        {% if invoice.status != 'applied' %}
+                        <td>
+                            <button class="btn btn-xs btn-outline" onclick="openMatchModal({{ loop.index0 }}, '{{ item.description }}', '{{ item.matched_inventory_id }}')">Match</button>
+                            <button class="btn btn-xs" onclick="openEditLineModal({{ loop.index0 }}, '{{ item.description }}', {{ item.quantity }}, '{{ item.unit }}', {{ item.unit_price }}, {{ item.total_price }})">Edit</button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4"></td>
+                        <td><strong>Subtotal</strong></td>
+                        <td><strong>${{ "%.2f"|format(invoice.subtotal) }}</strong></td>
+                        <td colspan="{% if invoice.status != 'applied' %}2{% else %}1{% endif %}"></td>
+                    </tr>
+                    {% if invoice.tax > 0 %}
+                    <tr>
+                        <td colspan="4"></td>
+                        <td>Tax</td>
+                        <td>${{ "%.2f"|format(invoice.tax) }}</td>
+                        <td colspan="{% if invoice.status != 'applied' %}2{% else %}1{% endif %}"></td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td colspan="4"></td>
+                        <td><strong>Total</strong></td>
+                        <td><strong>${{ "%.2f"|format(invoice.total) }}</strong></td>
+                        <td colspan="{% if invoice.status != 'applied' %}2{% else %}1{% endif %}"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    {% if invoice.status != 'applied' %}
+    <div class="invoice-actions">
+        <form method="POST" action="{{ url_for('apply_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Apply prices from this invoice to your inventory? This will update unit prices for all matched items.')">
+            <button type="submit" class="btn btn-primary btn-lg" {% if invoice.matched_count == 0 %}disabled title="Match at least one item first"{% endif %}>
+                ✓ Apply {{ invoice.matched_count }} Price Updates to Inventory
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('delete_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Delete this invoice?')">
+            <button type="submit" class="btn btn-danger">🗑️ Delete</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Raw OCR Text (collapsible) -->
+    {% if invoice.raw_text %}
+    <details class="card" style="margin-top: 20px;">
+        <summary class="card-header" style="cursor: pointer;">
+            <h3>📄 Raw OCR Text</h3>
+        </summary>
+        <div class="card-body">
+            <pre class="ocr-text">{{ invoice.raw_text }}</pre>
+        </div>
+    </details>
+    {% endif %}
+</div>
+
+<!-- Match Item Modal -->
+<div class="modal" id="matchModal">
+    <div class="modal-content">
+        <form method="POST" id="matchForm">
+            <div class="modal-header">
+                <h3>Match to Inventory</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('matchModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Invoice item: <strong id="matchItemDesc"></strong></p>
+                <input type="hidden" name="line_index" id="matchLineIndex">
+                <div class="form-group">
+                    <label>Match to Inventory Item</label>
+                    <select name="inventory_id" id="matchInventorySelect" class="form-control">
+                        <option value="">-- No Match --</option>
+                        {% for item in inventory_items|sort(attribute='name') %}
+                        <option value="{{ item.id }}">{{ item.name }} ({{ item.category.value }}) — ${{ "%.2f"|format(item.cost_per_unit) }}/{{ item.unit }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('matchModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Match</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Line Item Modal -->
+<div class="modal" id="editLineModal">
+    <div class="modal-content">
+        <form method="POST" id="editLineForm">
+            <div class="modal-header">
+                <h3>Edit Line Item</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('editLineModal').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="line_index" id="editLineIndex">
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" name="description" id="editLineDesc" class="form-control">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" name="quantity" id="editLineQty" class="form-control" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit</label>
+                        <input type="text" name="unit" id="editLineUnit" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Unit Price ($)</label>
+                        <input type="number" name="unit_price" id="editLineUnitPrice" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Total ($)</label>
+                        <input type="number" name="total_price" id="editLineTotalPrice" class="form-control" step="0.01" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('editLineModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openMatchModal(lineIndex, description, currentMatchId) {
+    document.getElementById('matchLineIndex').value = lineIndex;
+    document.getElementById('matchItemDesc').textContent = description;
+    document.getElementById('matchInventorySelect').value = currentMatchId || '';
+    document.getElementById('matchForm').action = '/invoices/{{ invoice.id }}/match';
+    document.getElementById('matchModal').classList.add('active');
+}
+
+function openEditLineModal(lineIndex, description, qty, unit, unitPrice, totalPrice) {
+    document.getElementById('editLineIndex').value = lineIndex;
+    document.getElementById('editLineDesc').value = description;
+    document.getElementById('editLineQty').value = qty;
+    document.getElementById('editLineUnit').value = unit;
+    document.getElementById('editLineUnitPrice').value = unitPrice;
+    document.getElementById('editLineTotalPrice').value = totalPrice;
+    document.getElementById('editLineForm').action = '/invoices/{{ invoice.id }}/edit-item';
+    document.getElementById('editLineModal').classList.add('active');
+}
+</script>
+{% endblock %}

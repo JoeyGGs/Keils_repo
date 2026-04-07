@@ -19,6 +19,7 @@
         <button class="tab-btn" onclick="showTab('inventory')">📋 Inventory</button>
         <button class="tab-btn" onclick="showTab('vendors')">🏪 Vendors</button>
         <button class="tab-btn" onclick="showTab('count')">📊 Order Count</button>
+        <button class="tab-btn" onclick="showTab('ordering')">🛒 Ordering</button>
     </div>
 
     <!-- Orders Tab -->
@@ -169,6 +170,11 @@
 
     <!-- Vendors Tab -->
     <div id="vendors-tab" class="tab-content">
+        {% if session.user.role == 'manager' %}
+        <div style="margin-bottom: 16px;">
+            <button class="btn btn-primary" onclick="document.getElementById('addVendorModal').classList.add('active')">+ Add Vendor</button>
+        </div>
+        {% endif %}
         <div class="vendors-grid">
             {% for vendor in vendors %}
             <div class="card vendor-detail-card">
@@ -200,8 +206,23 @@
                             <input type="email" name="email" value="{{ vendor.email }}" placeholder="Email address">
                         </div>
                         <div class="form-group">
+                            <label>Categories Supplied</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="MEATS" {% if 'MEATS' in vendor.categories %}checked{% endif %}> Meats</label>
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="CHEESES" {% if 'CHEESES' in vendor.categories %}checked{% endif %}> Cheeses</label>
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="SALADS" {% if 'SALADS' in vendor.categories %}checked{% endif %}> Salads</label>
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="BREADS" {% if 'BREADS' in vendor.categories %}checked{% endif %}> Breads</label>
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="CONDIMENTS" {% if 'CONDIMENTS' in vendor.categories %}checked{% endif %}> Condiments</label>
+                                <label class="checkbox-label"><input type="checkbox" name="categories" value="SUPPLIES" {% if 'SUPPLIES' in vendor.categories %}checked{% endif %}> Supplies</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label>Notes</label>
                             <textarea name="notes" rows="2" placeholder="Ordering notes, account numbers, etc.">{{ vendor.notes }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Website URL (for web platform ordering)</label>
+                            <input type="url" name="website_url" value="{{ vendor.website_url }}" placeholder="https://...">
                         </div>
                         {% if session.user.role == 'manager' %}
                         <div class="vendor-actions">
@@ -210,6 +231,15 @@
                         {% endif %}
                     </form>
                     {% if session.user.role == 'manager' %}
+                    <div class="vendor-ordering-toggle">
+                        <form method="POST" action="{{ url_for('toggle_vendor_ordering', vendor_id=vendor.id) }}" style="display:inline;">
+                            {% if vendor.ordering_enabled %}
+                            <button type="submit" class="btn btn-sm btn-outline" title="Disable ordering for this vendor">🛒 Ordering Enabled</button>
+                            {% else %}
+                            <button type="submit" class="btn btn-sm" title="Enable ordering for this vendor">Enable Ordering</button>
+                            {% endif %}
+                        </form>
+                    </div>
                     <form method="POST" action="{{ url_for('delete_vendor', vendor_id=vendor.id) }}" class="delete-vendor-form">
                         <button type="submit" class="btn btn-danger btn-full" onclick="return confirm('Delete {{ vendor.name }}? This cannot be undone.')">Delete Vendor</button>
                     </form>
@@ -219,6 +249,62 @@
             {% endfor %}
         </div>
     </div>
+
+<!-- Add Vendor Modal -->
+<div id="addVendorModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Vendor</h3>
+            <button class="modal-close" onclick="document.getElementById('addVendorModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_vendor') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Vendor Name *</label>
+                    <input type="text" name="name" required placeholder="e.g., Sysco, US Foods...">
+                </div>
+                <div class="form-group">
+                    <label>Contact Name</label>
+                    <input type="text" name="contact_name" placeholder="Contact person">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" name="phone" placeholder="Phone number">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" placeholder="Email address">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Categories Supplied</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="MEATS"> Meats</label>
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="CHEESES"> Cheeses</label>
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="SALADS"> Salads</label>
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="BREADS"> Breads</label>
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="CONDIMENTS"> Condiments</label>
+                        <label class="checkbox-label"><input type="checkbox" name="categories" value="SUPPLIES"> Supplies</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes" rows="2" placeholder="Ordering notes, account numbers, etc."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Website URL (for web platform ordering)</label>
+                    <input type="url" name="website_url" placeholder="https://...">
+                    <small>If provided, the vendor's ordering page will embed this site</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('addVendorModal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Vendor</button>
+            </div>
+        </form>
+    </div>
+</div>
 
     <!-- Order Count Tab -->
     <div id="count-tab" class="tab-content">
@@ -347,6 +433,40 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Ordering Tab -->
+    <div id="ordering-tab" class="tab-content">
+        {% if ordering_vendors %}
+        <div class="vendor-cards" style="margin-bottom: 20px;">
+            {% for vendor in ordering_vendors %}
+            <a href="{{ url_for('ordering', vendor=vendor.id) }}" class="vendor-card">
+                <div class="vendor-card-icon">
+                    {% if vendor.ordering_type == 'kehe' %}🚚{% elif vendor.ordering_type == 'catalog' %}📋{% elif vendor.ordering_type == 'webview' %}🌐{% else %}📦{% endif %}
+                </div>
+                <div class="vendor-card-info">
+                    <strong>{{ vendor.name }}</strong>
+                    {% if vendor.ordering_type == 'kehe' %}
+                    <span class="vendor-type-badge">KeHE CONNECT</span>
+                    {% elif vendor.ordering_type == 'catalog' %}
+                    <span class="vendor-type-badge">Product Catalog</span>
+                    {% elif vendor.ordering_type == 'webview' %}
+                    <span class="vendor-type-badge">Web Platform</span>
+                    {% else %}
+                    <span class="vendor-type-badge">Standard</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body" style="text-align: center; padding: 2rem;">
+                <p class="empty-state">No vendors are enabled for ordering yet.</p>
+                <p style="color: var(--text-secondary);">Go to the <strong>Vendors</strong> tab to manage your vendor list, then enable ordering for the ones you order through.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Add Item Modal -->
@@ -465,7 +585,12 @@ function showTab(tabName) {
     
     // Show selected tab
     document.getElementById(tabName + '-tab').classList.add('active');
-    event.target.classList.add('active');
+    // Find the button that matches
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes("'" + tabName + "'")) {
+            btn.classList.add('active');
+        }
+    });
     
     // Save to localStorage
     localStorage.setItem('activeOrdersInventoryTab', tabName);
@@ -489,13 +614,17 @@ function updateCostLabel() {
     }
 }
 
-// Restore tab from localStorage on page load
+// Restore tab from URL params or localStorage on page load
 document.addEventListener('DOMContentLoaded', function() {
-    const savedTab = localStorage.getItem('activeOrdersInventoryTab');
-    if (savedTab) {
-        const tabBtn = document.querySelector('.tab-btn[onclick*="' + savedTab + '"]');
-        if (tabBtn) {
-            tabBtn.click();
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (tabParam) {
+        showTab(tabParam);
+    } else {
+        const savedTab = localStorage.getItem('activeOrdersInventoryTab');
+        if (savedTab) {
+            showTab(savedTab);
         }
     }
 });

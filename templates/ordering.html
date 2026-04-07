@@ -1,0 +1,1150 @@
+{% extends "base.html" %}
+
+{% block title %}Ordering Interface - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="ordering-page">
+    <div class="page-header">
+        <h2>🛒 Ordering Interface</h2>
+    </div>
+
+    <!-- Vendor Selector -->
+    <div class="vendor-selector">
+        {% if ordering_vendors %}
+        <div class="vendor-cards">
+            {% for vendor in ordering_vendors %}
+            <a href="{{ url_for('ordering', vendor=vendor.id) }}" 
+               class="vendor-card {% if selected_vendor and selected_vendor.id == vendor.id %}active{% endif %}">
+                <div class="vendor-card-icon">
+                    {% if vendor.ordering_type == 'kehe' %}🚚{% elif vendor.ordering_type == 'catalog' %}📋{% elif vendor.ordering_type == 'webview' %}🌐{% else %}📦{% endif %}
+                </div>
+                <div class="vendor-card-info">
+                    <strong>{{ vendor.name }}</strong>
+                    {% if vendor.ordering_type == 'kehe' %}
+                    <span class="vendor-type-badge">KeHE CONNECT</span>
+                    {% elif vendor.ordering_type == 'catalog' %}
+                    <span class="vendor-type-badge">Product Catalog</span>
+                    {% elif vendor.ordering_type == 'webview' %}
+                    <span class="vendor-type-badge">Web Platform</span>
+                    {% else %}
+                    <span class="vendor-type-badge">Standard</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state-box">
+            <p>No vendors are enabled for ordering yet.</p>
+            <p>Go to <a href="{{ url_for('orders_inventory') }}?tab=vendors">Vendors</a> to manage your vendor list, then enable ordering for vendors here.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not selected_vendor and ordering_vendors %}
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-body">
+            <p class="empty-state">👆 Select a vendor above to start ordering</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- KeHE Vendor Content -->
+    {% if selected_vendor and selected_vendor.ordering_type == 'kehe' %}
+    <div class="kehe-page" style="margin-top: 20px;">
+        <!-- KeHE Sub-Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="showKeHETab('order')">📦 Order</button>
+            <button class="tab-btn" onclick="showKeHETab('products')">📋 Product Catalog</button>
+            <button class="tab-btn" onclick="showKeHETab('history')">📜 Order History</button>
+            <button class="tab-btn" onclick="showKeHETab('settings')">⚙️ Settings</button>
+        </div>
+
+        <!-- Order Tab -->
+        <div id="order-tab" class="tab-content active">
+            <div class="kehe-order-section">
+                <!-- Warehouse Selection -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Select Warehouse</h3>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('kehe_select_warehouse') }}" class="warehouse-form">
+                            <div class="form-group">
+                                <label>Primary Warehouse</label>
+                                <select name="warehouse" class="form-control" onchange="this.form.submit()">
+                                    <option value="">-- Select Warehouse --</option>
+                                    {% for w in vendor_data.warehouses %}
+                                    <option value="{{ w.code }}" {% if vendor_data.config.primary_warehouse == w.code %}selected{% endif %}>
+                                        {{ w.code }} - {{ w.location }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </form>
+                        {% if vendor_data.config.primary_warehouse %}
+                        <p class="warehouse-info">✓ Orders will ship from <strong>{{ vendor_data.config.primary_warehouse }}</strong></p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Current Order -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Current Order</h3>
+                        {% if vendor_data.draft_order %}
+                        <span class="badge">{{ vendor_data.draft_order.items|length }} items</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if not vendor_data.config.primary_warehouse %}
+                        <p class="empty-state">Select a warehouse to start ordering</p>
+                        {% elif vendor_data.draft_order and vendor_data.draft_order.items %}
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Product</th>
+                                    <th>Cases</th>
+                                    <th>Case Cost</th>
+                                    <th>Total</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in vendor_data.draft_order.items %}
+                                <tr>
+                                    <td>{{ item.product_sku }}</td>
+                                    <td>{{ item.product_name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>${{ "%.2f"|format(item.case_cost) }}</td>
+                                    <td>${{ "%.2f"|format(item.total_cost) }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('kehe_remove_item', order_id=vendor_data.draft_order.id, sku=item.product_sku) }}" style="display:inline;">
+                                            <button type="submit" class="btn btn-xs btn-danger">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2"><strong>Total</strong></td>
+                                    <td><strong>{{ vendor_data.draft_order.total_cases }} cases</strong></td>
+                                    <td></td>
+                                    <td><strong>${{ "%.2f"|format(vendor_data.draft_order.total_cost) }}</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="order-actions">
+                            <form method="POST" action="{{ url_for('kehe_submit_order', order_id=vendor_data.draft_order.id) }}" style="display:inline;">
+                                <div class="form-group" style="display:inline-block; margin-right: 10px;">
+                                    <input type="text" name="po_number" placeholder="PO Number (optional)" class="form-control-sm">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Submit Order to KeHE</button>
+                            </form>
+                            <a href="{{ url_for('kehe_download_order', order_id=vendor_data.draft_order.id) }}" class="btn btn-outline">Download CSV</a>
+                            <form method="POST" action="{{ url_for('kehe_delete_order', order_id=vendor_data.draft_order.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this order?')">Delete Order</button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <p class="empty-state">No items in order yet.</p>
+                        {% if not vendor_data.products %}
+                        <div class="info-box">
+                            <p>⚠️ Your KeHE product catalog is empty. Go to the <strong>Product Catalog</strong> tab to add products before creating an order.</p>
+                            <button class="btn btn-outline" onclick="showKeHETab('products')">Go to Product Catalog</button>
+                        </div>
+                        {% elif vendor_data.config.primary_warehouse %}
+                        <p>Add products from the catalog below, or go to the Product Catalog tab.</p>
+                        <form method="POST" action="{{ url_for('kehe_create_order') }}" style="display:inline;">
+                            <input type="hidden" name="warehouse" value="{{ vendor_data.config.primary_warehouse }}">
+                            <button type="submit" class="btn btn-primary">Start New Order</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Quick Add from Inventory -->
+                {% if vendor_data.low_stock_mapped %}
+                <div class="card alert-card">
+                    <div class="card-header">
+                        <h3>⚠️ Low Stock Items (KeHE Mapped)</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Inventory Item</th>
+                                    <th>KeHE Product</th>
+                                    <th>Current Stock</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in vendor_data.low_stock_mapped %}
+                                <tr>
+                                    <td>{{ item.inventory_name }}</td>
+                                    <td>{{ item.kehe_product.name }}</td>
+                                    <td class="text-danger">{{ "%.1f"|format(item.current_qty) }} {{ item.unit }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('kehe_quick_add') }}" style="display:inline;">
+                                            <input type="hidden" name="sku" value="{{ item.kehe_product.sku }}">
+                                            <input type="number" name="quantity" value="1" min="1" class="qty-input">
+                                            <button type="submit" class="btn btn-xs btn-primary">Add Cases</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Products Tab -->
+        <div id="products-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>KeHE Product Catalog</h3>
+                    <div class="header-actions">
+                        {% if vendor_data.catalog_meta.last_refreshed %}
+                        <span class="catalog-status">Last refreshed: {{ vendor_data.catalog_meta.last_refreshed.strftime('%m/%d/%Y %I:%M %p') }}</span>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('kehe_refresh_catalog') }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline">🔄 Refresh Catalog</button>
+                        </form>
+                        <button class="btn btn-sm" onclick="document.getElementById('importModal').classList.add('active')">📥 Import CSV</button>
+                        <button class="btn btn-sm btn-primary" onclick="document.getElementById('addProductModal').classList.add('active')">+ Add Product</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Catalog Stats -->
+                    <div class="catalog-stats">
+                        <span class="stat">Total: <strong>{{ vendor_data.catalog_meta.total_products }}</strong> products</span>
+                        <span class="stat">Active: <strong>{{ vendor_data.catalog_meta.active_products }}</strong></span>
+                    </div>
+                    
+                    <!-- Search -->
+                    <form method="GET" action="{{ url_for('ordering') }}" class="search-form">
+                        <input type="hidden" name="vendor" value="{{ selected_vendor.id }}">
+                        <input type="hidden" name="tab" value="products">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <input type="text" name="search" value="{{ vendor_data.search_query or '' }}" placeholder="Search products by name, brand, or category...">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Search</button>
+                        </div>
+                    </form>
+
+                    {% if vendor_data.products %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Product</th>
+                                <th>Brand</th>
+                                <th>Pack Size</th>
+                                <th>Case Cost</th>
+                                <th>Warehouses</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in vendor_data.products %}
+                            <tr class="{% if not product.in_stock %}out-of-stock{% endif %}">
+                                <td><code>{{ product.sku }}</code></td>
+                                <td>{{ product.name }}</td>
+                                <td>{{ product.brand }}</td>
+                                <td>{{ product.pack_size }}</td>
+                                <td>${{ "%.2f"|format(product.case_cost) }}</td>
+                                <td>{{ product.warehouse_codes|join(', ') }}</td>
+                                <td>
+                                    {% if product.in_stock %}
+                                    <span class="badge badge-success">In Stock</span>
+                                    {% else %}
+                                    <span class="badge badge-danger">Out of Stock</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if vendor_data.draft_order and product.in_stock %}
+                                    <form method="POST" action="{{ url_for('kehe_add_item', order_id=vendor_data.draft_order.id) }}" style="display:inline;">
+                                        <input type="hidden" name="sku" value="{{ product.sku }}">
+                                        <input type="number" name="quantity" value="1" min="1" class="qty-input">
+                                        <button type="submit" class="btn btn-xs btn-primary">Add</button>
+                                    </form>
+                                    {% elif not product.in_stock %}
+                                    <form method="POST" action="{{ url_for('kehe_toggle_stock', sku=product.sku) }}" style="display:inline;">
+                                        <input type="hidden" name="action" value="available">
+                                        <button type="submit" class="btn btn-xs">Mark Available</button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted">Start order first</span>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('kehe_toggle_stock', sku=product.sku) }}" style="display:inline;">
+                                        {% if product.in_stock %}
+                                        <input type="hidden" name="action" value="unavailable">
+                                        <button type="submit" class="btn btn-xs btn-outline">Mark OOS</button>
+                                        {% endif %}
+                                    </form>
+                                    <form method="POST" action="{{ url_for('kehe_delete_product', sku=product.sku) }}" style="display:inline;">
+                                        <button type="submit" class="btn btn-xs btn-danger" onclick="return confirm('Delete this product from catalog?')">×</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-catalog-notice">
+                        <p class="empty-state">📦 No products in catalog yet.</p>
+                        <p>To start ordering from KeHE:</p>
+                        <ol>
+                            <li>Click <strong>"+ Add Product"</strong> above to add products from KeHE's catalog</li>
+                            <li>Enter the SKU, name, and pricing from your KeHE CONNECT account</li>
+                            <li>Make sure to set warehouse codes to <strong>DC41</strong> or <strong>DC45</strong></li>
+                        </ol>
+                        <button class="btn btn-primary" onclick="document.getElementById('addProductModal').classList.add('active')">+ Add Your First Product</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Inventory Mapping -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Map Inventory to KeHE Products</h3>
+                </div>
+                <div class="card-body">
+                    <p>Link your inventory items to KeHE products for quick reordering.</p>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Inventory Item</th>
+                                <th>Category</th>
+                                <th>Current KeHE SKU</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in vendor_data.inventory_items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.category.value }}</td>
+                                <td>
+                                    {% if vendor_data.inventory_mapping.get(item.id) %}
+                                    <code>{{ vendor_data.inventory_mapping.get(item.id) }}</code>
+                                    {% else %}
+                                    <span class="text-muted">Not mapped</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-xs" onclick="openMapModal('{{ item.id }}', '{{ item.name }}')">
+                                        {% if vendor_data.inventory_mapping.get(item.id) %}Change{% else %}Map{% endif %}
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Order History</h3>
+                </div>
+                <div class="card-body">
+                    {% if vendor_data.orders %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Date</th>
+                                <th>Warehouse</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>PO #</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in vendor_data.orders %}
+                            <tr>
+                                <td><code>{{ order.id }}</code></td>
+                                <td>{{ order.created_at.strftime('%m/%d/%Y') }}</td>
+                                <td>{{ order.warehouse_name }}</td>
+                                <td>{{ order.items|length }} items ({{ order.total_cases }} cases)</td>
+                                <td>${{ "%.2f"|format(order.total_cost) }}</td>
+                                <td>
+                                    <span class="badge badge-{% if order.status == 'submitted' %}warning{% elif order.status == 'delivered' %}success{% else %}default{% endif %}">
+                                        {{ order.status|capitalize }}
+                                    </span>
+                                </td>
+                                <td>{{ order.po_number or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-state">No order history yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>KeHE Account Settings</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('kehe_save_settings') }}">
+                        <div class="form-group">
+                            <label>KeHE Account Number</label>
+                            <input type="text" name="account_number" value="{{ vendor_data.config.account_number }}" placeholder="Your KeHE account number">
+                        </div>
+                        <div class="form-group">
+                            <label>KeHE Username (for reference)</label>
+                            <input type="text" name="username" value="{{ vendor_data.config.username }}" placeholder="Your KeHE CONNECT username">
+                        </div>
+                        <div class="form-group">
+                            <label>Primary Warehouse</label>
+                            <select name="primary_warehouse" class="form-control">
+                                <option value="">-- Select Warehouse --</option>
+                                {% for w in vendor_data.warehouses %}
+                                <option value="{{ w.code }}" {% if vendor_data.config.primary_warehouse == w.code %}selected{% endif %}>
+                                    {{ w.code }} - {{ w.location }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Default Delivery Instructions</label>
+                            <textarea name="delivery_instructions" rows="3" placeholder="Special delivery instructions...">{{ vendor_data.config.default_delivery_instructions }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Integration Info</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-box">
+                        <h4>How to use KeHE ordering:</h4>
+                        <ol>
+                            <li>Add products from KeHE to your catalog (get SKUs from KeHE CONNECT)</li>
+                            <li>Map your inventory items to KeHE products</li>
+                            <li>Create orders and add items</li>
+                            <li>Download the CSV or submit directly</li>
+                            <li>Upload CSV to KeHE CONNECT or use their bulk upload feature</li>
+                        </ol>
+                        <p><strong>Note:</strong> For full EDI integration, contact KeHE about their CONNECT API or EDI solutions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KeHE Add Product Modal -->
+    <div id="addProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add KeHE Product</h3>
+                <button class="modal-close" onclick="document.getElementById('addProductModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('kehe_add_product') }}">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>KeHE SKU *</label>
+                            <input type="text" name="sku" required placeholder="e.g., 12345">
+                        </div>
+                        <div class="form-group">
+                            <label>UPC</label>
+                            <input type="text" name="upc" placeholder="Product UPC">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Product Name *</label>
+                        <input type="text" name="name" required placeholder="Full product name">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Brand *</label>
+                            <input type="text" name="brand" required placeholder="Brand name">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <input type="text" name="category" placeholder="e.g., Deli Meats">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Pack Size</label>
+                            <input type="text" name="pack_size" placeholder="e.g., 12/8oz">
+                        </div>
+                        <div class="form-group">
+                            <label>Units per Case</label>
+                            <input type="number" name="units_per_case" value="12" min="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Case Cost ($)</label>
+                            <input type="number" name="case_cost" step="0.01" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Unit Cost ($)</label>
+                            <input type="number" name="unit_cost" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Available at Warehouses (comma-separated codes)</label>
+                        <input type="text" name="warehouse_codes" placeholder="e.g., DC01, DC04, DC08" value="{{ vendor_data.config.primary_warehouse }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('addProductModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- KeHE Map Inventory Modal -->
+    <div id="mapModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Map to KeHE Product</h3>
+                <button class="modal-close" onclick="document.getElementById('mapModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('kehe_map_inventory') }}">
+                <div class="modal-body">
+                    <p>Mapping: <strong id="mapItemName"></strong></p>
+                    <input type="hidden" name="inventory_id" id="mapInventoryId">
+                    <div class="form-group">
+                        <label>KeHE SKU</label>
+                        <select name="kehe_sku" class="form-control">
+                            <option value="">-- Select Product --</option>
+                            {% for product in vendor_data.products %}
+                            <option value="{{ product.sku }}">{{ product.sku }} - {{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('mapModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- KeHE Import CSV Modal -->
+    <div id="importModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>📥 Import KeHE Catalog from CSV</h3>
+                <button class="modal-close" onclick="document.getElementById('importModal').classList.remove('active')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('kehe_import_csv') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="info-box">
+                        <h4>How to export from KeHE CONNECT:</h4>
+                        <ol>
+                            <li>Log into <a href="https://connect.kehe.com" target="_blank">KeHE CONNECT Retailer</a></li>
+                            <li>Search for products or browse the catalog</li>
+                            <li>Export the product list to CSV/Excel</li>
+                            <li>Upload the file here</li>
+                        </ol>
+                        <p><strong>Expected columns:</strong> SKU, Name, Brand, Category, Pack Size, Case Cost, Unit Cost, UPC</p>
+                        <p><em>Column names are flexible - the system will try to match common variations.</em></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>CSV File *</label>
+                        <input type="file" name="csv_file" accept=".csv,.txt" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Default Warehouse</label>
+                        <select name="warehouse">
+                            <option value="">Both DC41 & DC45</option>
+                            <option value="DC41">DC41 Only</option>
+                            <option value="DC45">DC45 Only</option>
+                        </select>
+                        <small>If not specified in CSV, products will be assigned to this warehouse</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="clear_existing" value="1">
+                            Clear existing catalog before import
+                        </label>
+                        <small>Check this to replace all products, leave unchecked to add/update</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('importModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import Catalog</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Catalog Vendor Content -->
+    {% if selected_vendor and selected_vendor.ordering_type == 'catalog' %}
+    <div class="catalog-page" style="margin-top: 20px;">
+        <!-- Sub-Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="showCatalogTab('order')">🛒 Build Order</button>
+            <button class="tab-btn" onclick="showCatalogTab('catalog')">📋 Product Catalog</button>
+            <button class="tab-btn" onclick="showCatalogTab('history')">📜 Order History</button>
+        </div>
+
+        <!-- ===== BUILD ORDER TAB ===== -->
+        <div id="catalog-order-tab" class="tab-content active">
+            <div class="catalog-order-section">
+                <!-- Current Draft Order -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Current Order</h3>
+                        {% if vendor_data.draft_order %}
+                        <span class="badge">{{ vendor_data.draft_order.items|length }} items</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if vendor_data.draft_order and vendor_data.draft_order.items %}
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>SKU</th>
+                                    <th>Qty</th>
+                                    <th>Unit</th>
+                                    <th>Cost</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in vendor_data.draft_order.items %}
+                                <tr>
+                                    <td>{{ item.product_name }}</td>
+                                    <td>{{ item.sku }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.unit }}</td>
+                                    <td>${{ "%.2f"|format(item.cost) }}</td>
+                                    <td><strong>${{ "%.2f"|format(item.total_cost) }}</strong></td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('vendor_catalog_remove_item', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id, product_id=item.product_id) }}" style="display:inline">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Remove">✕</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="5"><strong>Order Total</strong></td>
+                                    <td><strong>${{ "%.2f"|format(vendor_data.draft_order.total_cost) }}</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <!-- Submit Order -->
+                        <div class="order-actions" style="margin-top: 16px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            <form method="POST" action="{{ url_for('vendor_catalog_submit_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;">
+                                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
+                                    <label>PO Number (optional)</label>
+                                    <input type="text" name="po_number" class="form-control" placeholder="PO-001">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0; flex: 2; min-width: 200px;">
+                                    <label>Notes (optional)</label>
+                                    <input type="text" name="notes" class="form-control" placeholder="Delivery instructions, etc.">
+                                </div>
+                                <button type="submit" class="btn btn-primary">✓ Submit Order</button>
+                            </form>
+                            <a href="{{ url_for('vendor_catalog_print_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" target="_blank" class="btn btn-outline">🖨️ Print</a>
+                            <form method="POST" action="{{ url_for('vendor_catalog_delete_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" style="display:inline" onsubmit="return confirm('Delete this draft order?')">
+                                <button type="submit" class="btn btn-danger">🗑️ Delete Draft</button>
+                            </form>
+                        </div>
+
+                        {% elif vendor_data.draft_order %}
+                        <p class="empty-state">Your order is empty. Add products from the catalog below or from the Product Catalog tab.</p>
+                        {% else %}
+                        <p class="empty-state">No draft order yet. Start adding products to create one automatically.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Quick-Add from Catalog -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Add Products to Order</h3>
+                    </div>
+                    <div class="card-body">
+                        {% if vendor_data.products %}
+                        <div class="catalog-product-grid">
+                            {% for product in vendor_data.products %}
+                            <div class="catalog-product-card">
+                                <div class="catalog-product-info">
+                                    <strong>{{ product.name }}</strong>
+                                    {% if product.sku %}<span class="product-sku">{{ product.sku }}</span>{% endif %}
+                                    {% if product.pack_size %}<span class="product-detail">{{ product.pack_size }}</span>{% endif %}
+                                    {% if product.cost > 0 %}<span class="product-cost">${{ "%.2f"|format(product.cost) }}/{{ product.unit }}</span>{% endif %}
+                                </div>
+                                <form method="POST" action="{{ url_for('vendor_catalog_add_item', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id if vendor_data.draft_order else '') }}" class="catalog-add-form" data-vendor-id="{{ selected_vendor.id }}" data-product-id="{{ product.id }}">
+                                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                                    <input type="number" name="quantity" value="1" min="1" class="form-control qty-input">
+                                    <button type="submit" class="btn btn-sm btn-primary">+ Add</button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="empty-state">No products in catalog yet. Go to the <strong>Product Catalog</strong> tab to add products.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== PRODUCT CATALOG TAB ===== -->
+        <div id="catalog-catalog-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Product Catalog — {{ selected_vendor.name }}</h3>
+                    <button class="btn btn-primary" onclick="document.getElementById('addProductModal').classList.add('active')">+ Add Product</button>
+                </div>
+                <div class="card-body">
+                    {% if vendor_data.products %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>SKU</th>
+                                <th>Category</th>
+                                <th>Pack Size</th>
+                                <th>Unit</th>
+                                <th>Cost</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in vendor_data.products %}
+                            <tr>
+                                <td>
+                                    <strong>{{ product.name }}</strong>
+                                    {% if product.description %}<br><small style="color: var(--text-secondary)">{{ product.description }}</small>{% endif %}
+                                </td>
+                                <td>{{ product.sku }}</td>
+                                <td>{{ product.category }}</td>
+                                <td>{{ product.pack_size }}</td>
+                                <td>{{ product.unit }}</td>
+                                <td>{% if product.cost > 0 %}${{ "%.2f"|format(product.cost) }}{% else %}—{% endif %}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline" onclick="openEditProductModal('{{ product.id }}', '{{ product.name }}', '{{ product.sku }}', '{{ product.description }}', '{{ product.category }}', '{{ product.unit }}', '{{ product.pack_size }}', '{{ product.cost }}')">Edit</button>
+                                    <form method="POST" action="{{ url_for('vendor_catalog_delete_product', vendor_id=selected_vendor.id, product_id=product.id) }}" style="display:inline" onsubmit="return confirm('Remove this product from catalog?')">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state-box">
+                        <p>No products in catalog yet.</p>
+                        <p>Add the products you regularly order from {{ selected_vendor.name }} to build your catalog.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== ORDER HISTORY TAB ===== -->
+        <div id="catalog-history-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Order History — {{ selected_vendor.name }}</h3>
+                </div>
+                <div class="card-body">
+                    {% if vendor_data.past_orders %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Date</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>PO #</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in vendor_data.past_orders|reverse %}
+                            <tr>
+                                <td><strong>{{ order.id }}</strong></td>
+                                <td>{{ order.submitted_at.strftime('%m/%d/%Y') if order.submitted_at else order.created_at.strftime('%m/%d/%Y') }}</td>
+                                <td>{{ order.total_items }} items</td>
+                                <td>${{ "%.2f"|format(order.total_cost) }}</td>
+                                <td>
+                                    {% if order.status == 'submitted' %}
+                                    <span class="badge" style="background: var(--primary)">Submitted</span>
+                                    {% elif order.status == 'received' %}
+                                    <span class="badge" style="background: #22c55e">Received</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.po_number or '—' }}</td>
+                                <td>
+                                    <a href="{{ url_for('vendor_catalog_print_order', vendor_id=selected_vendor.id, order_id=order.id) }}" target="_blank" class="btn btn-sm btn-outline">🖨️</a>
+                                    {% if order.status == 'submitted' %}
+                                    <form method="POST" action="{{ url_for('vendor_catalog_received_order', vendor_id=selected_vendor.id, order_id=order.id) }}" style="display:inline">
+                                        <button type="submit" class="btn btn-sm btn-primary">✓ Received</button>
+                                    </form>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('vendor_catalog_delete_order', vendor_id=selected_vendor.id, order_id=order.id) }}" style="display:inline" onsubmit="return confirm('Delete this order?')">
+                                        <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-state">No past orders yet. Submit an order from the Build Order tab to see it here.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div class="modal" id="addProductModal">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('vendor_catalog_add_product', vendor_id=selected_vendor.id) }}">
+                <div class="modal-header">
+                    <h3>Add Product to Catalog</h3>
+                    <button type="button" class="modal-close" onclick="document.getElementById('addProductModal').classList.remove('active')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Product Name *</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g., 16oz Deli Container">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>SKU / Item #</label>
+                            <input type="text" name="sku" class="form-control" placeholder="e.g., AAP-1600">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <input type="text" name="category" class="form-control" placeholder="e.g., Containers" list="catList">
+                            <datalist id="catList">
+                                {% for cat in vendor_data.categories %}
+                                <option value="{{ cat }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" name="description" class="form-control" placeholder="Optional description">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Pack Size</label>
+                            <input type="text" name="pack_size" class="form-control" placeholder="e.g., 500/case">
+                        </div>
+                        <div class="form-group">
+                            <label>Unit</label>
+                            <select name="unit" class="form-control">
+                                <option value="case">Case</option>
+                                <option value="each">Each</option>
+                                <option value="box">Box</option>
+                                <option value="bag">Bag</option>
+                                <option value="roll">Roll</option>
+                                <option value="pack">Pack</option>
+                                <option value="sleeve">Sleeve</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost ($)</label>
+                            <input type="number" name="cost" class="form-control" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('addProductModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Product Modal -->
+    <div class="modal" id="editProductModal">
+        <div class="modal-content">
+            <form method="POST" id="editProductForm">
+                <div class="modal-header">
+                    <h3>Edit Product</h3>
+                    <button type="button" class="modal-close" onclick="document.getElementById('editProductModal').classList.remove('active')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Product Name *</label>
+                        <input type="text" name="name" id="editProductName" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>SKU / Item #</label>
+                            <input type="text" name="sku" id="editProductSku" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <input type="text" name="category" id="editProductCategory" class="form-control" list="catListEdit">
+                            <datalist id="catListEdit">
+                                {% for cat in vendor_data.categories %}
+                                <option value="{{ cat }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" name="description" id="editProductDescription" class="form-control">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Pack Size</label>
+                            <input type="text" name="pack_size" id="editProductPackSize" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Unit</label>
+                            <select name="unit" id="editProductUnit" class="form-control">
+                                <option value="case">Case</option>
+                                <option value="each">Each</option>
+                                <option value="box">Box</option>
+                                <option value="bag">Bag</option>
+                                <option value="roll">Roll</option>
+                                <option value="pack">Pack</option>
+                                <option value="sleeve">Sleeve</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost ($)</label>
+                            <input type="number" name="cost" id="editProductCost" class="form-control" step="0.01" min="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('editProductModal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Webview Vendor Content -->
+    {% if selected_vendor and selected_vendor.ordering_type == 'webview' %}
+    <div class="webview-vendor-page" style="margin-top: 20px;">
+        <div class="card">
+            <div class="card-body" style="text-align: center; padding: 50px 30px;">
+                <div style="font-size: 3rem; margin-bottom: 16px;">🌐</div>
+                <h3 style="margin-bottom: 8px;">{{ selected_vendor.name }}</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 24px;">
+                    Order through {{ selected_vendor.name }}'s online platform
+                </p>
+                <a href="{{ selected_vendor.website_url }}" target="_blank" class="btn btn-primary" style="font-size: 1.1rem; padding: 12px 32px;">
+                    Open {{ selected_vendor.name }} ↗
+                </a>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 16px;">
+                    {{ selected_vendor.website_url }}
+                </p>
+                {% if selected_vendor.notes %}
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 8px;">
+                    📝 {{ selected_vendor.notes }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Standard Vendor Content -->
+    {% if selected_vendor and selected_vendor.ordering_type == 'standard' %}
+    <div class="standard-order-page" style="margin-top: 20px;">
+        <div class="card">
+            <div class="card-header">
+                <h3>Order Sheet - {{ selected_vendor.name }}</h3>
+                {% if vendor_data.order %}
+                <span class="text-muted">Generated {{ vendor_data.order.generated_date.strftime('%m/%d/%Y %I:%M %p') }}</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if vendor_data.order and vendor_data.order.items %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Suggested Order</th>
+                            <th>Unit</th>
+                            <th>Est. Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item_data in vendor_data.order.items %}
+                        <tr class="{% if item_data.item.is_low_stock %}low-stock{% endif %}">
+                            <td>{{ item_data.item.name }}</td>
+                            <td>{{ item_data.item.category.value }}</td>
+                            <td>{{ "%.1f"|format(item_data.item.quantity) }}</td>
+                            <td><strong>{{ "%.1f"|format(item_data.suggested_quantity) }}</strong></td>
+                            <td>{{ item_data.item.unit }}</td>
+                            <td>${{ "%.2f"|format(item_data.estimated_cost) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5"><strong>Estimated Total</strong></td>
+                            <td><strong>${{ "%.2f"|format(vendor_data.order.total_estimated_cost) }}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <p class="empty-state">No items need ordering from this vendor right now.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if selected_vendor and selected_vendor.ordering_type == 'kehe' %}
+function showKeHETab(tabName) {
+    document.querySelectorAll('.kehe-page .tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.kehe-page .tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.getElementById(tabName + '-tab').classList.add('active');
+    event.target.classList.add('active');
+    
+    localStorage.setItem('activeKeHETab', tabName);
+}
+
+function openMapModal(inventoryId, itemName) {
+    document.getElementById('mapInventoryId').value = inventoryId;
+    document.getElementById('mapItemName').textContent = itemName;
+    document.getElementById('mapModal').classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (tabParam) {
+        const tabBtn = document.querySelector('.kehe-page .tab-btn[onclick*="' + tabParam + '"]');
+        if (tabBtn) tabBtn.click();
+    } else {
+        const savedTab = localStorage.getItem('activeKeHETab');
+        if (savedTab) {
+            const tabBtn = document.querySelector('.kehe-page .tab-btn[onclick*="' + savedTab + '"]');
+            if (tabBtn) tabBtn.click();
+        }
+    }
+});
+{% endif %}
+
+{% if selected_vendor and selected_vendor.ordering_type == 'catalog' %}
+function showCatalogTab(tabName) {
+    document.querySelectorAll('.catalog-page .tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.catalog-page .tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.getElementById('catalog-' + tabName + '-tab').classList.add('active');
+    event.target.classList.add('active');
+    
+    localStorage.setItem('activeCatalogTab', tabName);
+}
+
+function openEditProductModal(id, name, sku, description, category, unit, packSize, cost) {
+    document.getElementById('editProductName').value = name;
+    document.getElementById('editProductSku').value = sku;
+    document.getElementById('editProductDescription').value = description;
+    document.getElementById('editProductCategory').value = category;
+    document.getElementById('editProductUnit').value = unit;
+    document.getElementById('editProductPackSize').value = packSize;
+    document.getElementById('editProductCost').value = cost;
+    document.getElementById('editProductForm').action = '/vendor-catalog/{{ selected_vendor.id }}/product/' + id + '/edit';
+    document.getElementById('editProductModal').classList.add('active');
+}
+
+// Auto-create draft order when adding to cart if none exists
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (tabParam) {
+        const tabBtn = document.querySelector('.catalog-page .tab-btn[onclick*="' + tabParam + '"]');
+        if (tabBtn) tabBtn.click();
+    } else {
+        const savedTab = localStorage.getItem('activeCatalogTab');
+        if (savedTab) {
+            const tabBtn = document.querySelector('.catalog-page .tab-btn[onclick*="' + savedTab + '"]');
+            if (tabBtn) tabBtn.click();
+        }
+    }
+
+    // Handle add-to-order forms — auto create draft if needed
+    document.querySelectorAll('.catalog-add-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            var action = form.getAttribute('action');
+            if (action.indexOf('/order//add') !== -1) {
+                // No draft order exists — create one first via AJAX then resubmit
+                e.preventDefault();
+                var vendorId = form.dataset.vendorId;
+                var productId = form.dataset.productId;
+                
+                fetch('/vendor-catalog/' + vendorId + '/order/create', { method: 'POST' })
+                    .then(function() {
+                        // Reload page to get draft order, then user can add
+                        window.location.href = '{{ url_for("ordering", vendor=selected_vendor.id) }}';
+                    });
+            }
+        });
+    });
+});
+{% endif %}
+</script>
+{% endblock %}
