@@ -57,6 +57,32 @@
         <p>&copy; 2024 Keil's Food Stores - Service Deli Management System</p>
     </footer>
 
+    {% if session.user %}
+    <!-- Mobile Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('dashboard') }}" class="bottom-nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <span class="bottom-nav-icon">📊</span>
+            <span class="bottom-nav-label">Dashboard</span>
+        </a>
+        <a href="{{ url_for('schedule') }}" class="bottom-nav-item {% if request.endpoint == 'schedule' %}active{% endif %}">
+            <span class="bottom-nav-icon">📅</span>
+            <span class="bottom-nav-label">Schedule</span>
+        </a>
+        <a href="{{ url_for('orders_inventory') }}" class="bottom-nav-item {% if request.endpoint in ['orders_inventory', 'ordering'] %}active{% endif %}">
+            <span class="bottom-nav-icon">📦</span>
+            <span class="bottom-nav-label">Orders</span>
+        </a>
+        <a href="{{ url_for('invoices_page') }}" class="bottom-nav-item {% if request.endpoint == 'invoices_page' %}active{% endif %}">
+            <span class="bottom-nav-icon">🧾</span>
+            <span class="bottom-nav-label">Invoices</span>
+        </a>
+        <a href="{{ url_for('employees') }}" class="bottom-nav-item {% if request.endpoint == 'employees' %}active{% endif %}">
+            <span class="bottom-nav-icon">👥</span>
+            <span class="bottom-nav-label">Team</span>
+        </a>
+    </nav>
+    {% endif %}
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

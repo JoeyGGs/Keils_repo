@@ -174,6 +174,11 @@ body {
     display: block;
 }
 
+/* ===== Mobile Bottom Navigation Bar ===== */
+.bottom-nav {
+    display: none; /* Hidden on desktop */
+}
+
 /* Hide mobile-only user info on desktop */
 .nav-user-mobile {
     display: none;
@@ -1091,7 +1096,76 @@ body {
     /* --- iOS safe areas --- */
     body {
         -webkit-text-size-adjust: 100%;
+        padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    }
+
+    /* --- Mobile Bottom Nav Bar --- */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+        background: linear-gradient(180deg, var(--bg-darker) 0%, var(--bg-darkest) 100%);
+        border-top: 1px solid var(--border-dark);
+        height: calc(68px + env(safe-area-inset-bottom));
         padding-bottom: env(safe-area-inset-bottom);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        justify-content: space-around;
+        align-items: stretch;
+    }
+
+    .bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        text-decoration: none;
+        color: var(--text-muted);
+        font-size: 0.65rem;
+        gap: 3px;
+        padding: 8px 4px;
+        transition: color 0.2s, transform 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        position: relative;
+    }
+
+    .bottom-nav-item .bottom-nav-icon {
+        font-size: 1.35rem;
+        line-height: 1;
+    }
+
+    .bottom-nav-item .bottom-nav-label {
+        font-weight: 500;
+        letter-spacing: 0.2px;
+    }
+
+    .bottom-nav-item.active {
+        color: var(--primary);
+    }
+
+    .bottom-nav-item.active::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 32px;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 0 0 3px 3px;
+        box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    .bottom-nav-item:active {
+        transform: scale(0.92);
+    }
+
+    /* Hide footer on mobile since bottom nav takes its place */
+    .footer {
+        display: none;
     }
 
     /* --- Mobile Navbar --- */
