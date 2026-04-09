@@ -621,14 +621,14 @@
     <div class="catalog-page" style="margin-top: 20px;">
         <!-- Website Login Button (for vendors with a website URL) -->
         {% if selected_vendor.website_url %}
-        <div style="margin-bottom: 16px;">
-            <form method="POST" action="{{ url_for('aaplastic_launch_login') }}" style="display:inline;">
-                <button type="submit" class="btn btn-primary">🌐 Login to {{ selected_vendor.name }} Website</button>
+        <div style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+            <a href="{{ selected_vendor.website_url }}" target="_blank" class="btn btn-primary">🌐 Open {{ selected_vendor.name }} Website</a>
+            <form method="POST" action="{{ url_for('aaplastic_launch_login') }}" style="display:inline;" class="desktop-only-form">
+                <button type="submit" class="btn btn-outline">🤖 Auto-Login (Desktop Only)</button>
             </form>
-            <form method="POST" action="{{ url_for('aaplastic_scrape_catalog') }}" style="display:inline; margin-left: 8px;">
-                <button type="submit" class="btn btn-outline">🔄 Sync Catalog from Website</button>
+            <form method="POST" action="{{ url_for('aaplastic_scrape_catalog') }}" style="display:inline;" class="desktop-only-form">
+                <button type="submit" class="btn btn-outline">🔄 Sync Catalog</button>
             </form>
-            <a href="{{ selected_vendor.website_url }}" target="_blank" class="btn btn-outline" style="margin-left: 8px;">Open Website Manually</a>
         </div>
         {% endif %}
 
@@ -692,6 +692,20 @@
 
                         <!-- Submit Order -->
                         <div class="order-actions" style="margin-top: 16px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                            {% if selected_vendor.id == 'V005' %}
+                            {# AA Plastics: Submit goes through the website — login, Deli, Start Order, fill items #}
+                            <form method="POST" action="{{ url_for('aaplastic_submit_order', order_id=vendor_data.draft_order.id) }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;" onsubmit="return confirm('This will open AA Plastics, log in, select Deli, start an order, and fill your quantities for review.\n\nYou review and submit on their website.\n\nContinue?')">
+                                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
+                                    <label>PO Number (optional)</label>
+                                    <input type="text" name="po_number" class="form-control" placeholder="PO-001">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0; flex: 2; min-width: 200px;">
+                                    <label>Notes (optional)</label>
+                                    <input type="text" name="notes" class="form-control" placeholder="Delivery instructions, etc.">
+                                </div>
+                                <button type="submit" class="btn btn-primary">🤖 Submit Order via Website</button>
+                            </form>
+                            {% else %}
                             <form method="POST" action="{{ url_for('vendor_catalog_submit_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;">
                                 <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
                                     <label>PO Number (optional)</label>
@@ -703,6 +717,7 @@
                                 </div>
                                 <button type="submit" class="btn btn-primary">✓ Submit Order</button>
                             </form>
+                            {% endif %}
                             <a href="{{ url_for('vendor_catalog_print_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" target="_blank" class="btn btn-outline">🖨️ Print</a>
                             <form method="POST" action="{{ url_for('vendor_catalog_delete_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" style="display:inline" onsubmit="return confirm('Delete this draft order?')">
                                 <button type="submit" class="btn btn-danger">🗑️ Delete Draft</button>

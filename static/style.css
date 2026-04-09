@@ -1168,6 +1168,11 @@ body {
         display: none;
     }
 
+    /* Hide desktop-only actions (Selenium auto-login, scraper) on mobile */
+    .desktop-only-form {
+        display: none;
+    }
+
     /* --- Mobile Navbar --- */
     .navbar {
         height: 56px;

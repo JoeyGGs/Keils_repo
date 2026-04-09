@@ -185,11 +185,17 @@
                 
                 <div class="form-group">
                     <label>Select Schedule Image</label>
-                    <input type="file" name="schedule_image" id="schedule-image" accept="image/*" required>
+                    <input type="file" name="schedule_image" id="schedule-image" accept="image/*">
                 </div>
                 
                 <div id="image-preview" class="image-preview" style="display:none;">
                     <img id="preview-img" src="" alt="Preview">
+                </div>
+
+                <div class="form-group" style="margin-top: 12px;">
+                    <label>Or Paste Schedule Text <small style="font-weight: normal; color: var(--text-secondary);">(if camera scan doesn't work)</small></label>
+                    <textarea name="schedule_text" id="schedule-text" rows="6" placeholder="Paste schedule text here...&#10;&#10;Example:&#10;Michael    5-1:30 BAR    5-1:30 BAR    OFF    9-5 MID    5-1:30    OFF    OFF&#10;Steve      9-5 MID      OFF           9-5    5-1:30 BAR  OFF       9-5    OFF" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+                    <small style="color: var(--text-secondary);">One employee per line. Use spaces/tabs between days (Mon-Sun). Use time ranges like 5-1:30, OFF, or R/O.</small>
                 </div>
                 
                 <div class="target-week">

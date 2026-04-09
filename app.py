@@ -565,19 +565,13 @@ def apply_shift_presets():
 @app.route('/schedule/ocr', methods=['POST'])
 @login_required
 def schedule_ocr():
-    """Process uploaded schedule image with OCR"""
-    if 'schedule_image' not in request.files:
-        flash('No image uploaded', 'error')
-        return redirect(url_for('schedule'))
+    """Process uploaded schedule image with OCR, or parse pasted text"""
+    file = request.files.get('schedule_image')
+    pasted_text = request.form.get('schedule_text', '').strip()
+    has_file = file and file.filename != ''
     
-    file = request.files['schedule_image']
-    if file.filename == '':
-        flash('No image selected', 'error')
-        return redirect(url_for('schedule'))
-    
-    # Check if Tesseract is available
-    if not is_tesseract_available():
-        flash('OCR requires Tesseract. Please install from: https://github.com/UB-Mannheim/tesseract/wiki', 'error')
+    if not has_file and not pasted_text:
+        flash('Please upload a schedule image or paste schedule text', 'error')
         return redirect(url_for('schedule'))
     
     try:
@@ -591,13 +585,28 @@ def schedule_ocr():
         employee_names = [e.name for e in employees]
         employee_map = {e.name.upper(): e for e in employees}
         
-        # Process image
-        image_data = file.read()
         parser = ScheduleOCRParser()
-        parsed_shifts, raw_text = parser.process_image(image_data, week_start, employee_names)
+        parser.known_employees = [e.upper() for e in employee_names]
+        
+        if has_file:
+            # Check if Tesseract is available
+            if not is_tesseract_available():
+                flash('OCR requires Tesseract. Please install from: https://github.com/UB-Mannheim/tesseract/wiki', 'error')
+                return redirect(url_for('schedule'))
+            
+            # Process image with OCR
+            image_data = file.read()
+            parsed_shifts, raw_text = parser.process_image(image_data, week_start, employee_names)
+        else:
+            # Parse pasted text directly
+            raw_text = pasted_text
+            parsed_shifts = parser.parse_schedule_text(pasted_text, week_start)
         
         if not parsed_shifts:
-            flash(f'Could not parse any shifts from image. Raw text: {raw_text[:500]}...', 'warning')
+            # Show debug info to help diagnose
+            emp_names = ', '.join(employee_names[:5])
+            text_preview = raw_text[:300].replace('\n', ' | ') if raw_text else '(empty)'
+            flash(f'OCR could not match any shifts. Employees looked for: {emp_names}... Raw text preview: {text_preview}', 'warning')
             return redirect(url_for('schedule', week=week_offset))
         
         # Load existing shifts and remove current week's shifts
@@ -1602,6 +1611,21 @@ def aaplastic_scrape_catalog():
         flash('AA Plastics catalog scraper launched — it will log in, select Deli, and import all items. Check the Chrome window for progress.', 'success')
     except Exception as e:
         flash(f'Could not launch catalog scraper: {e}', 'error')
+    return redirect(url_for('ordering', vendor='V005'))
+
+
+@app.route('/ordering/aaplastic-submit-order/<order_id>', methods=['POST'])
+@login_required
+def aaplastic_submit_order(order_id):
+    """Launch AA Plastics order submission — opens browser, logs in, starts order, fills quantities."""
+    try:
+        import subprocess
+        import sys
+        script_path = os.path.join(os.path.dirname(__file__), 'aaplastic_submit_order.py')
+        subprocess.Popen([sys.executable, script_path, order_id], cwd=os.path.dirname(__file__))
+        flash('AA Plastics order opened — check the Chrome window. Quantities are filled in for you to REVIEW. You must submit manually on their site.', 'success')
+    except Exception as e:
+        flash(f'Could not launch AA Plastics order submission: {e}', 'error')
     return redirect(url_for('ordering', vendor='V005'))
 
 

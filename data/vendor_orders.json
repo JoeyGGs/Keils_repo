@@ -1,0 +1,41 @@
+[
+  {
+    "id": "3ACB8304",
+    "vendor_id": "V005",
+    "vendor_name": "All American Plastics",
+    "created_at": "2026-04-09T10:39:20.019765",
+    "items": [
+      {
+        "product_id": "0AF24909",
+        "product_name": "114604-1 GL JR CONC DEGREASER 1/EA",
+        "sku": "AFL-1364",
+        "quantity": 2,
+        "unit": "each",
+        "cost": 0.0,
+        "total_cost": 0.0
+      },
+      {
+        "product_id": "5A21EC59",
+        "product_name": "PUS910500-9\"X10.75\" SILVER POP UP FOIL 3000/CS 500/PK",
+        "sku": "AAI-9POPFOIL",
+        "quantity": 1,
+        "unit": "each",
+        "cost": 0.0,
+        "total_cost": 0.0
+      },
+      {
+        "product_id": "46B3A30F",
+        "product_name": "AR18X500HD-18\"X500' SILVER ALUM FOIL HEAVY DUTY 1/RL",
+        "sku": "AAI-18FOILHD",
+        "quantity": 1,
+        "unit": "each",
+        "cost": 0.0,
+        "total_cost": 0.0
+      }
+    ],
+    "status": "draft",
+    "po_number": "",
+    "notes": "",
+    "submitted_at": null
+  }
+]
