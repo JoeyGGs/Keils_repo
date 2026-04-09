@@ -5,7 +5,16 @@
 {% block content %}
 <div class="ordering-page">
     <div class="page-header">
-        <h2>🛒 Ordering Interface</h2>
+        <h2>Orders & Inventory</h2>
+    </div>
+
+    <!-- Main Tab Navigation (same as orders_inventory page) -->
+    <div class="tab-nav">
+        <a href="{{ url_for('orders_inventory') }}?tab=orders" class="tab-btn" style="text-decoration:none;">📦 Orders</a>
+        <a href="{{ url_for('orders_inventory') }}?tab=inventory" class="tab-btn" style="text-decoration:none;">📋 Inventory</a>
+        <a href="{{ url_for('orders_inventory') }}?tab=vendors" class="tab-btn" style="text-decoration:none;">🏪 Vendors</a>
+        <a href="{{ url_for('orders_inventory') }}?tab=count" class="tab-btn" style="text-decoration:none;">📊 Order Count</a>
+        <a href="{{ url_for('ordering') }}" class="tab-btn active" style="text-decoration:none;">🛒 Ordering</a>
     </div>
 
     <!-- Vendor Selector -->
@@ -610,6 +619,19 @@
     <!-- Catalog Vendor Content -->
     {% if selected_vendor and selected_vendor.ordering_type == 'catalog' %}
     <div class="catalog-page" style="margin-top: 20px;">
+        <!-- Website Login Button (for vendors with a website URL) -->
+        {% if selected_vendor.website_url %}
+        <div style="margin-bottom: 16px;">
+            <form method="POST" action="{{ url_for('aaplastic_launch_login') }}" style="display:inline;">
+                <button type="submit" class="btn btn-primary">🌐 Login to {{ selected_vendor.name }} Website</button>
+            </form>
+            <form method="POST" action="{{ url_for('aaplastic_scrape_catalog') }}" style="display:inline; margin-left: 8px;">
+                <button type="submit" class="btn btn-outline">🔄 Sync Catalog from Website</button>
+            </form>
+            <a href="{{ selected_vendor.website_url }}" target="_blank" class="btn btn-outline" style="margin-left: 8px;">Open Website Manually</a>
+        </div>
+        {% endif %}
+
         <!-- Sub-Tab Navigation -->
         <div class="tab-nav">
             <button class="tab-btn active" onclick="showCatalogTab('order')">🛒 Build Order</button>
@@ -704,10 +726,14 @@
                         {% if vendor_data.products %}
                         <div class="catalog-product-grid">
                             {% for product in vendor_data.products %}
-                            <div class="catalog-product-card">
+                            <div class="catalog-product-card" style="display:flex; align-items:center; gap:12px;">
+                                {% if product.image_url %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width:50px; height:50px; object-fit:contain; border-radius:4px; flex-shrink:0;">
+                                {% endif %}
                                 <div class="catalog-product-info">
                                     <strong>{{ product.name }}</strong>
                                     {% if product.sku %}<span class="product-sku">{{ product.sku }}</span>{% endif %}
+                                    {% if product.item_code %}<span class="product-detail">Code: {{ product.item_code }}</span>{% endif %}
                                     {% if product.pack_size %}<span class="product-detail">{{ product.pack_size }}</span>{% endif %}
                                     {% if product.cost > 0 %}<span class="product-cost">${{ "%.2f"|format(product.cost) }}/{{ product.unit }}</span>{% endif %}
                                 </div>
@@ -739,8 +765,10 @@
                     <table class="table">
                         <thead>
                             <tr>
+                                <th style="width:60px"></th>
                                 <th>Name</th>
                                 <th>SKU</th>
+                                <th>Code</th>
                                 <th>Category</th>
                                 <th>Pack Size</th>
                                 <th>Unit</th>
@@ -752,10 +780,16 @@
                             {% for product in vendor_data.products %}
                             <tr>
                                 <td>
+                                    {% if product.image_url %}
+                                    <img src="{{ product.image_url }}" alt="" style="width:48px; height:48px; object-fit:contain; border-radius:4px;">
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <strong>{{ product.name }}</strong>
                                     {% if product.description %}<br><small style="color: var(--text-secondary)">{{ product.description }}</small>{% endif %}
                                 </td>
                                 <td>{{ product.sku }}</td>
+                                <td>{{ product.item_code }}</td>
                                 <td>{{ product.category }}</td>
                                 <td>{{ product.pack_size }}</td>
                                 <td>{{ product.unit }}</td>

@@ -11,7 +11,8 @@
     ],
     "notes": "Premium deli meats and cheeses",
     "ordering_enabled": false,
-    "ordering_type": "standard"
+    "ordering_type": "standard",
+    "website_url": ""
   },
   {
     "id": "V002",
@@ -28,7 +29,8 @@
     ],
     "notes": "General food service distributor",
     "ordering_enabled": true,
-    "ordering_type": "kehe"
+    "ordering_type": "kehe",
+    "website_url": ""
   },
   {
     "id": "V003",
@@ -45,7 +47,8 @@
     ],
     "notes": "Food service distributor",
     "ordering_enabled": false,
-    "ordering_type": "standard"
+    "ordering_type": "standard",
+    "website_url": ""
   },
   {
     "id": "V004",
@@ -58,7 +61,8 @@
     ],
     "notes": "Food service distributor",
     "ordering_enabled": false,
-    "ordering_type": "standard"
+    "ordering_type": "standard",
+    "website_url": ""
   },
   {
     "id": "V005",
@@ -78,10 +82,15 @@
     "contact_name": "",
     "phone": "",
     "email": "",
-    "categories": [],
-    "notes": "",
-    "ordering_enabled": false,
-    "ordering_type": "standard"
+    "categories": [
+      "FROZEN",
+      "REFRIGERATED",
+      "MISC"
+    ],
+    "notes": "Frozen, refrigerated and misc items",
+    "ordering_enabled": true,
+    "ordering_type": "catalog",
+    "website_url": ""
   },
   {
     "id": "V007",
@@ -89,9 +98,12 @@
     "contact_name": "",
     "phone": "",
     "email": "",
-    "categories": [],
-    "notes": "",
-    "ordering_enabled": false,
-    "ordering_type": "standard"
+    "categories": [
+      "PRODUCE"
+    ],
+    "notes": "Fresh produce distributor",
+    "ordering_enabled": true,
+    "ordering_type": "catalog",
+    "website_url": ""
   }
 ]

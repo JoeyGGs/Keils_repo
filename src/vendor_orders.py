@@ -24,6 +24,8 @@ class VendorProduct:
     pack_size: str = ""
     cost: float = 0.0
     is_active: bool = True
+    image_url: str = ""  # Product image URL
+    item_code: str = ""  # Vendor-specific item code
 
 
 @dataclass
@@ -122,7 +124,9 @@ class VendorOrderManager:
                 'id': p.id, 'vendor_id': p.vendor_id, 'name': p.name,
                 'sku': p.sku, 'description': p.description, 'category': p.category,
                 'unit': p.unit, 'pack_size': p.pack_size, 'cost': p.cost,
-                'is_active': p.is_active
+                'is_active': p.is_active,
+                'image_url': getattr(p, 'image_url', ''),
+                'item_code': getattr(p, 'item_code', ''),
             }
             for p in products
         ]

@@ -41,9 +41,33 @@
 
     <!-- Invoice List -->
     {% if invoices %}
+    <div class="card" style="margin-bottom: 16px;">
+        <div class="card-body" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 600; white-space: nowrap;">Filter by Vendor:</label>
+                <select id="invoiceVendorFilter" onchange="filterInvoices()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
+                    <option value="">All Vendors</option>
+                    {% for vendor in vendors %}
+                    <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 600; white-space: nowrap;">Status:</label>
+                <select id="invoiceStatusFilter" onchange="filterInvoices()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
+                    <option value="">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="applied">Applied</option>
+                </select>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="clearInvoiceFilters()" style="white-space: nowrap;">Clear Filters</button>
+            <span id="invoiceFilterCount" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+        </div>
+    </div>
     <div class="card">
         <div class="card-body" style="padding: 0;">
-            <table class="table">
+            <table class="table" id="invoiceTable">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -57,7 +81,7 @@
                 </thead>
                 <tbody>
                     {% for inv in invoices %}
-                    <tr>
+                    <tr class="invoice-row" data-vendor="{{ inv.vendor_name }}" data-status="{{ inv.status }}">
                         <td>{{ inv.uploaded_at.strftime('%m/%d/%Y') }}</td>
                         <td><strong>{{ inv.vendor_name or 'Unknown' }}</strong></td>
                         <td>{{ inv.invoice_number or '—' }}</td>
@@ -165,4 +189,40 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterInvoices() {
+    const vendorFilter = document.getElementById('invoiceVendorFilter')?.value || '';
+    const statusFilter = document.getElementById('invoiceStatusFilter')?.value || '';
+    const rows = document.querySelectorAll('#invoiceTable .invoice-row');
+    let visible = 0;
+    rows.forEach(row => {
+        const vendor = row.getAttribute('data-vendor');
+        const status = row.getAttribute('data-status');
+        let show = true;
+        if (vendorFilter && vendor !== vendorFilter) show = false;
+        if (statusFilter && status !== statusFilter) show = false;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    const countEl = document.getElementById('invoiceFilterCount');
+    if (countEl) {
+        if (vendorFilter || statusFilter) {
+            countEl.textContent = `Showing ${visible} of ${rows.length} invoices`;
+        } else {
+            countEl.textContent = `${rows.length} invoices`;
+        }
+    }
+}
+function clearInvoiceFilters() {
+    const ve = document.getElementById('invoiceVendorFilter');
+    const se = document.getElementById('invoiceStatusFilter');
+    if (ve) ve.value = '';
+    if (se) se.value = '';
+    filterInvoices();
+}
+document.addEventListener('DOMContentLoaded', filterInvoices);
+</script>
 {% endblock %}

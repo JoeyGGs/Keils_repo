@@ -799,6 +799,22 @@ def orders_inventory():
     # Load ordering vendors for the Ordering tab
     ordering_vendors = vendor_manager.get_ordering_vendors()
     
+    # Load ALL vendor catalog products for the Inventory tab
+    all_catalog_products = vendor_order_manager._load_all_products()
+    # Build a vendor name lookup
+    vendor_name_map = {v.id: v.name for v in vendors}
+    # Collect unique vendors and categories for filters
+    catalog_vendors = sorted(set(
+        (p.vendor_id, vendor_name_map.get(p.vendor_id, p.vendor_id))
+        for p in all_catalog_products if p.is_active
+    ), key=lambda x: x[1])
+    catalog_categories = sorted(set(
+        p.category for p in all_catalog_products if p.is_active and p.category
+    ))
+    # Attach vendor name to each product for display
+    for p in all_catalog_products:
+        p.vendor_name = vendor_name_map.get(p.vendor_id, p.vendor_id)
+    
     return render_template('orders_inventory.html',
                          items=items,
                          by_category=by_category,
@@ -812,6 +828,9 @@ def orders_inventory():
                          last_count=last_count,
                          next_count_due=next_count_due,
                          ordering_vendors=ordering_vendors,
+                         all_catalog_products=[p for p in all_catalog_products if p.is_active],
+                         catalog_vendors=catalog_vendors,
+                         catalog_categories=catalog_categories,
                          today=date.today())
 
 
@@ -831,7 +850,7 @@ def add_inventory():
     unit = request.form.get('unit', 'each')
     min_quantity = float(request.form.get('min_quantity', 5))
     cost = float(request.form.get('cost', 0))
-    cost_type = request.form.get('cost_type', 'unit')
+    cost_type = 'lbs' if unit == 'per lbs' else 'unit'
     supplier = request.form.get('supplier', '')
     
     item_id = f"INV{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -1556,6 +1575,36 @@ def toggle_vendor_ordering(vendor_id):
     return redirect(url_for('ordering'))
 
 
+@app.route('/ordering/aaplastic-login', methods=['POST'])
+@login_required
+def aaplastic_launch_login():
+    """Launch the AA Plastics auto-login in a browser via Selenium."""
+    try:
+        import subprocess
+        import sys
+        script_path = os.path.join(os.path.dirname(__file__), 'aaplastic_login.py')
+        subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(__file__))
+        flash('AA Plastics login launched — check the Chrome window that just opened.', 'success')
+    except Exception as e:
+        flash(f'Could not launch AA Plastics login: {e}', 'error')
+    return redirect(url_for('ordering', vendor='V005'))
+
+
+@app.route('/ordering/aaplastic-scrape', methods=['POST'])
+@login_required
+def aaplastic_scrape_catalog():
+    """Launch the AA Plastics catalog scraper in a subprocess."""
+    try:
+        import subprocess
+        import sys
+        script_path = os.path.join(os.path.dirname(__file__), 'aaplastic_scrape_catalog.py')
+        subprocess.Popen([sys.executable, script_path], cwd=os.path.dirname(__file__))
+        flash('AA Plastics catalog scraper launched — it will log in, select Deli, and import all items. Check the Chrome window for progress.', 'success')
+    except Exception as e:
+        flash(f'Could not launch catalog scraper: {e}', 'error')
+    return redirect(url_for('ordering', vendor='V005'))
+
+
 # ============ Vendor Catalog Routes ============
 
 def _catalog_redirect(vendor_id, tab=None):
@@ -1585,6 +1634,15 @@ def vendor_catalog_add_product(vendor_id):
     vendor_order_manager.add_product(product)
     flash(f'Product "{product.name}" added to catalog', 'success')
     return _catalog_redirect(vendor_id, tab='catalog')
+
+
+@app.route('/catalog-product/<product_id>/update-unit', methods=['POST'])
+@login_required
+def catalog_product_update_unit(product_id):
+    """Update a catalog product's unit inline from the inventory page"""
+    new_unit = request.form.get('unit', 'each')
+    vendor_order_manager.update_product(product_id, unit=new_unit)
+    return redirect(url_for('orders_inventory') + '?tab=inventory')
 
 
 @app.route('/vendor-catalog/<vendor_id>/product/<product_id>/edit', methods=['POST'])
