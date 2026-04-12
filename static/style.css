@@ -2265,6 +2265,19 @@ body {
     font-size: 0.9rem;
 }
 
+.invoice-folder-tab {
+    background: #222;
+    color: #aaa;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.invoice-folder-tab.active {
+    background: #000;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+}
+
 .invoice-stats {
     display: flex;
     gap: 16px;

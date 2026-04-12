@@ -29,95 +29,175 @@
             <span class="stat-label">Total Invoices</span>
         </div>
         <div class="stat-card">
-            <span class="stat-number">{{ invoices|selectattr('status', 'equalto', 'pending')|list|length }}</span>
-            <span class="stat-label">Pending Review</span>
+            <span class="stat-number">{{ receiving_invoices|length }}</span>
+            <span class="stat-label">Receiving</span>
         </div>
         <div class="stat-card">
-            <span class="stat-number">{{ invoices|selectattr('status', 'equalto', 'applied')|list|length }}</span>
-            <span class="stat-label">Applied</span>
+            <span class="stat-number">{{ settled_invoices|length }}</span>
+            <span class="stat-label">Settled</span>
         </div>
     </div>
     {% endif %}
 
-    <!-- Invoice List -->
-    {% if invoices %}
-    <div class="card" style="margin-bottom: 16px;">
-        <div class="card-body" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-weight: 600; white-space: nowrap;">Filter by Vendor:</label>
-                <select id="invoiceVendorFilter" onchange="filterInvoices()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
-                    <option value="">All Vendors</option>
-                    {% for vendor in vendors %}
-                    <option value="{{ vendor.name }}">{{ vendor.name }}</option>
-                    {% endfor %}
-                </select>
+    <!-- Folder Tabs -->
+    <div style="display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--border-color, #e5e7eb);">
+        <button class="btn invoice-folder-tab active" id="tabReceiving" onclick="showInvoiceFolder('receiving')" style="border-radius: 8px 8px 0 0; border: 2px solid var(--border-color, #e5e7eb); border-bottom: none; margin-bottom: -2px; padding: 10px 20px; font-weight: 600; font-size: 1rem;">
+            📥 Receiving <span class="badge badge-warning" style="margin-left: 6px; font-size: 0.75rem;">{{ receiving_invoices|length }}</span>
+        </button>
+        <button class="btn invoice-folder-tab" id="tabSettled" onclick="showInvoiceFolder('settled')" style="border-radius: 8px 8px 0 0; border: 2px solid var(--border-color, #e5e7eb); border-bottom: none; margin-bottom: -2px; padding: 10px 20px; font-weight: 600; font-size: 1rem; margin-left: 4px;">
+            ✅ Settled <span class="badge badge-success" style="margin-left: 6px; font-size: 0.75rem;">{{ settled_invoices|length }}</span>
+        </button>
+    </div>
+
+    <!-- ==================== RECEIVING FOLDER ==================== -->
+    <div id="folderReceiving" class="invoice-folder">
+        {% if receiving_invoices %}
+        <div class="card" style="border-top-left-radius: 0;">
+            <div class="card-body" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-weight: 600; white-space: nowrap;">Vendor:</label>
+                    <select id="receivingVendorFilter" onchange="filterInvoiceTable('receiving')" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
+                        <option value="">All Vendors</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-weight: 600; white-space: nowrap;">Status:</label>
+                    <select id="receivingStatusFilter" onchange="filterInvoiceTable('receiving')" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                    </select>
+                </div>
+                <span id="receivingFilterCount" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-weight: 600; white-space: nowrap;">Status:</label>
-                <select id="invoiceStatusFilter" onchange="filterInvoices()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
-                    <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="reviewed">Reviewed</option>
-                    <option value="applied">Applied</option>
-                </select>
+        </div>
+        <div class="card" style="border-top-left-radius: 0; border-top-right-radius: 0; border-top: none;">
+            <div class="card-body" style="padding: 0;">
+                <table class="table" id="receivingTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Vendor</th>
+                            <th>Invoice #</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in receiving_invoices %}
+                        <tr class="invoice-row" data-vendor="{{ inv.vendor_name }}" data-status="{{ inv.status }}">
+                            <td>{{ inv.uploaded_at.strftime('%m/%d/%Y') }}</td>
+                            <td><strong>{{ inv.vendor_name or 'Unknown' }}</strong></td>
+                            <td>{{ inv.invoice_number or '—' }}</td>
+                            <td>{{ inv.item_count }} items</td>
+                            <td>${{ "%.2f"|format(inv.total) }}</td>
+                            <td>
+                                {% if inv.order_discrepancies %}
+                                <span class="badge badge-warning" title="{{ inv.order_discrepancies|length }} discrepancies vs order">⚠️ {{ inv.order_discrepancies|length }} issue{{ 's' if inv.order_discrepancies|length != 1 }}</span>
+                                {% elif inv.matched_order_id %}
+                                <span class="badge badge-success">✓ Matches Order</span>
+                                {% elif inv.status == 'pending' %}
+                                <span class="badge badge-warning">Pending</span>
+                                {% elif inv.status == 'reviewed' %}
+                                <span class="badge" style="background: #3b82f6">Reviewed</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('review_invoice', invoice_id=inv.id) }}" class="btn btn-xs btn-primary">Review</a>
+                                <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline" onsubmit="return confirm('Delete this invoice?')">
+                                    <button type="submit" class="btn btn-xs btn-danger">×</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="clearInvoiceFilters()" style="white-space: nowrap;">Clear Filters</button>
-            <span id="invoiceFilterCount" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
         </div>
-    </div>
-    <div class="card">
-        <div class="card-body" style="padding: 0;">
-            <table class="table" id="invoiceTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Vendor</th>
-                        <th>Invoice #</th>
-                        <th>Items</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inv in invoices %}
-                    <tr class="invoice-row" data-vendor="{{ inv.vendor_name }}" data-status="{{ inv.status }}">
-                        <td>{{ inv.uploaded_at.strftime('%m/%d/%Y') }}</td>
-                        <td><strong>{{ inv.vendor_name or 'Unknown' }}</strong></td>
-                        <td>{{ inv.invoice_number or '—' }}</td>
-                        <td>{{ inv.item_count }} items</td>
-                        <td>${{ "%.2f"|format(inv.total) }}</td>
-                        <td>
-                            {% if inv.status == 'pending' %}
-                            <span class="badge badge-warning">Pending</span>
-                            {% elif inv.status == 'reviewed' %}
-                            <span class="badge" style="background: #3b82f6">Reviewed</span>
-                            {% elif inv.status == 'applied' %}
-                            <span class="badge badge-success">Applied</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('review_invoice', invoice_id=inv.id) }}" class="btn btn-xs btn-primary">Review</a>
-                            <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline" onsubmit="return confirm('Delete this invoice?')">
-                                <button type="submit" class="btn btn-xs btn-danger">×</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        {% else %}
+        <div class="card" style="border-top-left-radius: 0;">
+            <div class="card-body" style="text-align: center; padding: 3rem;">
+                <div style="font-size: 3rem; margin-bottom: 12px;">📥</div>
+                <h3>No invoices in receiving</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload a vendor invoice image or paste invoice text to get started.<br>Prices will be automatically extracted and matched to your inventory.</p>
+                <button class="btn btn-primary" onclick="document.getElementById('uploadModal').classList.add('active')">📤 Upload Your First Invoice</button>
+            </div>
         </div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="card">
-        <div class="card-body" style="text-align: center; padding: 3rem;">
-            <div style="font-size: 3rem; margin-bottom: 12px;">🧾</div>
-            <h3>No invoices yet</h3>
-            <p style="color: var(--text-secondary); margin-bottom: 20px;">Upload a vendor invoice image or paste invoice text to get started.<br>Prices will be automatically extracted and matched to your inventory.</p>
-            <button class="btn btn-primary" onclick="document.getElementById('uploadModal').classList.add('active')">📤 Upload Your First Invoice</button>
+
+    <!-- ==================== SETTLED FOLDER ==================== -->
+    <div id="folderSettled" class="invoice-folder" style="display: none;">
+        {% if settled_invoices %}
+        <div class="card" style="border-top-right-radius: 0;">
+            <div class="card-body" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-weight: 600; white-space: nowrap;">Vendor:</label>
+                    <select id="settledVendorFilter" onchange="filterInvoiceTable('settled')" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color, #ccc);">
+                        <option value="">All Vendors</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.name }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <span id="settledFilterCount" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+            </div>
         </div>
+        <div class="card" style="border-top-left-radius: 0; border-top-right-radius: 0; border-top: none;">
+            <div class="card-body" style="padding: 0;">
+                <table class="table" id="settledTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Vendor</th>
+                            <th>Invoice #</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in settled_invoices %}
+                        <tr class="invoice-row" data-vendor="{{ inv.vendor_name }}" data-status="{{ inv.status }}">
+                            <td>{{ inv.uploaded_at.strftime('%m/%d/%Y') }}</td>
+                            <td><strong>{{ inv.vendor_name or 'Unknown' }}</strong></td>
+                            <td>{{ inv.invoice_number or '—' }}</td>
+                            <td>{{ inv.item_count }} items</td>
+                            <td>${{ "%.2f"|format(inv.total) }}</td>
+                            <td>
+                                <span class="badge badge-success">✍️ Signed</span>
+                                {% if inv.status == 'applied' %}
+                                <span class="badge badge-success">✓ Applied</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('review_invoice', invoice_id=inv.id) }}" class="btn btn-xs btn-outline">View</a>
+                                <form method="POST" action="{{ url_for('delete_invoice', invoice_id=inv.id) }}" style="display:inline" onsubmit="return confirm('Delete this settled invoice?')">
+                                    <button type="submit" class="btn btn-xs btn-danger">×</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="border-top-right-radius: 0;">
+            <div class="card-body" style="text-align: center; padding: 3rem;">
+                <div style="font-size: 3rem; margin-bottom: 12px;">✅</div>
+                <h3>No settled invoices yet</h3>
+                <p style="color: var(--text-secondary);">Invoices move here after their prices have been applied to your inventory.</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 
 <!-- Upload Invoice Modal -->
@@ -193,36 +273,53 @@
 
 {% block scripts %}
 <script>
-function filterInvoices() {
-    const vendorFilter = document.getElementById('invoiceVendorFilter')?.value || '';
-    const statusFilter = document.getElementById('invoiceStatusFilter')?.value || '';
-    const rows = document.querySelectorAll('#invoiceTable .invoice-row');
-    let visible = 0;
-    rows.forEach(row => {
-        const vendor = row.getAttribute('data-vendor');
-        const status = row.getAttribute('data-status');
-        let show = true;
+function showInvoiceFolder(folder) {
+    document.getElementById('folderReceiving').style.display = folder === 'receiving' ? '' : 'none';
+    document.getElementById('folderSettled').style.display = folder === 'settled' ? '' : 'none';
+    document.getElementById('tabReceiving').classList.toggle('active', folder === 'receiving');
+    document.getElementById('tabSettled').classList.toggle('active', folder === 'settled');
+    // Style active/inactive tabs
+    document.getElementById('tabReceiving').style.background = folder === 'receiving' ? '#000' : '#222';
+    document.getElementById('tabSettled').style.background = folder === 'settled' ? '#000' : '#222';
+}
+
+function filterInvoiceTable(folder) {
+    var vendorEl = document.getElementById(folder + 'VendorFilter');
+    var statusEl = document.getElementById(folder + 'StatusFilter');
+    var vendorFilter = vendorEl ? vendorEl.value : '';
+    var statusFilter = statusEl ? statusEl.value : '';
+    var table = document.getElementById(folder + 'Table');
+    if (!table) return;
+    var rows = table.querySelectorAll('.invoice-row');
+    var visible = 0;
+    rows.forEach(function(row) {
+        var vendor = row.getAttribute('data-vendor');
+        var status = row.getAttribute('data-status');
+        var show = true;
         if (vendorFilter && vendor !== vendorFilter) show = false;
         if (statusFilter && status !== statusFilter) show = false;
         row.style.display = show ? '' : 'none';
         if (show) visible++;
     });
-    const countEl = document.getElementById('invoiceFilterCount');
+    var countEl = document.getElementById(folder + 'FilterCount');
     if (countEl) {
         if (vendorFilter || statusFilter) {
-            countEl.textContent = `Showing ${visible} of ${rows.length} invoices`;
+            countEl.textContent = 'Showing ' + visible + ' of ' + rows.length + ' invoices';
         } else {
-            countEl.textContent = `${rows.length} invoices`;
+            countEl.textContent = rows.length + ' invoices';
         }
     }
 }
-function clearInvoiceFilters() {
-    const ve = document.getElementById('invoiceVendorFilter');
-    const se = document.getElementById('invoiceStatusFilter');
-    if (ve) ve.value = '';
-    if (se) se.value = '';
-    filterInvoices();
-}
-document.addEventListener('DOMContentLoaded', filterInvoices);
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check URL hash for initial folder
+    if (window.location.hash === '#settled') {
+        showInvoiceFolder('settled');
+    } else {
+        showInvoiceFolder('receiving');
+    }
+    filterInvoiceTable('receiving');
+    filterInvoiceTable('settled');
+});
 </script>
 {% endblock %}

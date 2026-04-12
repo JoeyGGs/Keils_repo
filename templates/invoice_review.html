@@ -7,7 +7,10 @@
     <div class="page-header">
         <h2>🧾 Review Invoice</h2>
         <div class="header-actions">
-            <a href="{{ url_for('invoices_page') }}" class="btn btn-outline">← Back to Invoices</a>
+            <a href="{{ url_for('invoices_page') }}{% if invoice.signed %}#settled{% endif %}" class="btn btn-outline">← Back to Invoices</a>
+            {% if invoice.signed %}
+            <span class="badge badge-success" style="font-size: 0.9rem; padding: 8px 16px;">✍️ Signed &amp; Settled</span>
+            {% endif %}
             {% if invoice.status == 'applied' %}
             <span class="badge badge-success" style="font-size: 0.9rem; padding: 8px 16px;">✓ Applied</span>
             {% endif %}
@@ -47,6 +50,81 @@
             </div>
         </div>
     </div>
+
+    <!-- Order Cross-Reference -->
+    {% if matched_order %}
+    <div class="card" style="margin-bottom: 16px; border-left: 3px solid {% if invoice.order_discrepancies %}#f59e0b{% else %}#22c55e{% endif %};">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h3 style="margin: 0;">📦 Order Cross-Reference</h3>
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                Matched to order <strong>{{ matched_order.po_number or matched_order.id }}</strong>
+                ({{ matched_order.vendor_name }}, {{ matched_order.submitted_at.strftime('%m/%d/%Y') if matched_order.submitted_at else 'N/A' }})
+            </span>
+        </div>
+        <div class="card-body">
+            {% if invoice.order_discrepancies %}
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+                <strong style="color: #92400e;">⚠️ {{ invoice.order_discrepancies|length }} discrepanc{{ 'y' if invoice.order_discrepancies|length == 1 else 'ies' }} found</strong>
+                <span style="color: #92400e;"> — review before signing.</span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Issue</th>
+                            <th>Item</th>
+                            <th>Ordered</th>
+                            <th>Received</th>
+                            <th>Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in invoice.order_discrepancies %}
+                        <tr>
+                            <td>
+                                {% if d.type == 'qty_mismatch' %}
+                                <span class="badge badge-warning" style="font-size: 0.75rem;">Qty Mismatch</span>
+                                {% elif d.type == 'extra_item' %}
+                                <span class="badge" style="background: #3b82f6; font-size: 0.75rem;">Extra Item</span>
+                                {% elif d.type == 'missing_item' %}
+                                <span class="badge badge-danger" style="font-size: 0.75rem;">Missing Item</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ d.item }}</strong></td>
+                            <td>{{ d.ordered_qty if d.ordered_qty is defined else '—' }}</td>
+                            <td>{{ d.received_qty if d.received_qty is defined else '—' }}</td>
+                            <td>
+                                {% if d.type == 'qty_mismatch' %}
+                                    {% if d.diff > 0 %}
+                                    <span style="color: #3b82f6;">+{{ d.diff }} extra</span>
+                                    {% else %}
+                                    <span style="color: #dc2626;">{{ d.diff }} short</span>
+                                    {% endif %}
+                                {% elif d.type == 'extra_item' %}
+                                    <span style="color: #3b82f6;">Not on order</span>
+                                {% elif d.type == 'missing_item' %}
+                                    <span style="color: #dc2626;">Not received</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div style="background: #dcfce7; border: 1px solid #22c55e; border-radius: 8px; padding: 12px 16px;">
+                <strong style="color: #166534;">✓ All items and quantities match the order.</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% elif invoice.vendor_name %}
+    <div class="card" style="margin-bottom: 16px; border-left: 3px solid var(--border-color, #e5e7eb);">
+        <div class="card-body" style="padding: 12px 16px; color: var(--text-secondary);">
+            📦 No matching submitted order found for <strong>{{ invoice.vendor_name }}</strong>. Items could not be cross-referenced.
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Applied Updates Summary -->
     {% if invoice.status == 'applied' and invoice.applied_updates %}
@@ -163,18 +241,27 @@
     </div>
 
     <!-- Action Buttons -->
-    {% if invoice.status != 'applied' %}
-    <div class="invoice-actions">
+    <div class="invoice-actions" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px;">
+        {% if not invoice.signed %}
+        <form method="POST" action="{{ url_for('sign_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Sign this invoice? It will move to the Settled folder.')">
+            <button type="submit" class="btn btn-primary btn-lg">✍️ Sign &amp; Settle</button>
+        </form>
+        {% else %}
+        <form method="POST" action="{{ url_for('unsign_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Remove signature? Invoice will move back to Receiving.')">
+            <button type="submit" class="btn btn-outline">↩ Move Back to Receiving</button>
+        </form>
+        {% endif %}
+        {% if invoice.status != 'applied' %}
         <form method="POST" action="{{ url_for('apply_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Apply prices from this invoice to your inventory? This will update unit prices for all matched items.')">
-            <button type="submit" class="btn btn-primary btn-lg" {% if invoice.matched_count == 0 %}disabled title="Match at least one item first"{% endif %}>
+            <button type="submit" class="btn btn-primary" {% if invoice.matched_count == 0 %}disabled title="Match at least one item first"{% endif %}>
                 ✓ Apply {{ invoice.matched_count }} Price Updates to Inventory
             </button>
         </form>
+        {% endif %}
         <form method="POST" action="{{ url_for('delete_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Delete this invoice?')">
             <button type="submit" class="btn btn-danger">🗑️ Delete</button>
         </form>
     </div>
-    {% endif %}
 
     <!-- Raw OCR Text (collapsible) -->
     {% if invoice.raw_text %}

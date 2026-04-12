@@ -64,6 +64,9 @@ class Invoice:
     status: str = "pending"  # pending, reviewed, applied
     applied_updates: List[Dict] = field(default_factory=list)
     notes: str = ""
+    signed: bool = False  # True = settled (has delivery signature)
+    matched_order_id: str = ""  # Matched vendor order ID
+    order_discrepancies: List[Dict] = field(default_factory=list)  # Item/qty mismatches vs order
 
     @property
     def item_count(self) -> int:
@@ -306,6 +309,9 @@ class InvoiceManager:
                         status=d.get('status', 'pending'),
                         applied_updates=d.get('applied_updates', []),
                         notes=d.get('notes', ''),
+                        signed=d.get('signed', False),
+                        matched_order_id=d.get('matched_order_id', ''),
+                        order_discrepancies=d.get('order_discrepancies', []),
                     ))
                 return invoices
         except (json.JSONDecodeError, IOError):
@@ -341,6 +347,9 @@ class InvoiceManager:
                 'status': inv.status,
                 'applied_updates': inv.applied_updates,
                 'notes': inv.notes,
+                'signed': inv.signed,
+                'matched_order_id': inv.matched_order_id,
+                'order_discrepancies': inv.order_discrepancies,
             })
         with open(self.invoices_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

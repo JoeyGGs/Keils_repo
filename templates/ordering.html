@@ -1090,6 +1090,7 @@
     </div>
     {% endif %}
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -1195,5 +1196,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 {% endif %}
+
+/* ------ AA Plastics submit handler (mobile-aware) ------ */
+function handleAAPlasticSubmit(form) {
+    var isMobile = /mobile|android|iphone|ipad|ipod|windows phone/i.test(navigator.userAgent);
+
+    if (isMobile) {
+        /* On mobile the server runs headless Selenium and returns a review page.
+           Show a loading overlay while the user waits (~15-30 seconds). */
+        if (!confirm('This will submit your order to AA Plastics via the server.\n\nThis can take 15-30 seconds — please wait.\n\nContinue?')) {
+            return false;
+        }
+        /* Show loading overlay */
+        var overlay = document.getElementById('aaLoadingOverlay');
+        if (overlay) overlay.style.display = 'flex';
+        return true; /* Allow the normal form POST — server returns the review page */
+    } else {
+        /* Desktop: opens a visible Chrome window on this machine */
+        return confirm('This will open AA Plastics, log in, select Deli, start an order, and fill your quantities for review.\n\nYou review and submit on their website.\n\nContinue?');
+    }
+}
 </script>
 {% endblock %}

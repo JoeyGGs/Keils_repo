@@ -1267,6 +1267,99 @@ def api_low_stock():
 
 # ============ Invoice Routes ============
 
+def _match_invoice_to_order(invoice):
+    """Cross-reference an invoice against submitted vendor orders for the same vendor.
+
+    Finds the best-matching order and produces a list of discrepancies
+    (missing items, extra items, quantity mismatches).
+    """
+    if not invoice.vendor_name:
+        return
+
+    # Find the vendor by name
+    vendors = vendor_manager.get_all_vendors()
+    vendor = next((v for v in vendors if v.name.lower() == invoice.vendor_name.lower()), None)
+    if not vendor:
+        return
+
+    # Get submitted (not-draft) orders for this vendor
+    orders = vendor_order_manager.get_orders(vendor.id)
+    submitted = [o for o in orders if o.status in ('submitted', 'received')]
+    if not submitted:
+        return
+
+    # Pick the most recent submitted order
+    submitted.sort(key=lambda o: o.submitted_at or o.created_at, reverse=True)
+    order = submitted[0]
+
+    invoice.matched_order_id = order.id
+
+    # Build lookup of order items by normalised name
+    def _norm(s):
+        return ' '.join(s.upper().split())
+
+    order_items_by_name = {}
+    for oi in order.items:
+        order_items_by_name[_norm(oi.product_name)] = oi
+
+    discrepancies = []
+    matched_order_names = set()
+
+    for li in invoice.line_items:
+        inv_name = _norm(li.description)
+
+        # Try exact then fuzzy match
+        best_match = None
+        best_key = None
+        best_score = 0
+        inv_words = set(inv_name.split())
+
+        for oname, oi in order_items_by_name.items():
+            oname_words = set(oname.split())
+            if inv_name == oname:
+                best_match = oi
+                best_key = oname
+                best_score = 1.0
+                break
+            overlap = len(inv_words & oname_words)
+            score = overlap / max(len(oname_words), 1)
+            if score > best_score and score >= 0.5:
+                best_score = score
+                best_match = oi
+                best_key = oname
+
+        if best_match:
+            matched_order_names.add(best_key)
+            # Check quantity
+            ordered_qty = best_match.quantity
+            received_qty = li.quantity
+            if abs(ordered_qty - received_qty) > 0.01:
+                discrepancies.append({
+                    'type': 'qty_mismatch',
+                    'item': li.description,
+                    'ordered_qty': ordered_qty,
+                    'received_qty': received_qty,
+                    'diff': round(received_qty - ordered_qty, 2),
+                })
+        else:
+            # Item on invoice but not in order
+            discrepancies.append({
+                'type': 'extra_item',
+                'item': li.description,
+                'received_qty': li.quantity,
+            })
+
+    # Items in order but not on invoice
+    for oname, oi in order_items_by_name.items():
+        if oname not in matched_order_names:
+            discrepancies.append({
+                'type': 'missing_item',
+                'item': oi.product_name,
+                'ordered_qty': oi.quantity,
+            })
+
+    invoice.order_discrepancies = discrepancies
+
 @app.route('/invoices')
 @login_required
 def invoices_page():
@@ -1275,8 +1368,13 @@ def invoices_page():
     vendors = vendor_manager.get_all_vendors()
     # Sort newest first
     invoices.sort(key=lambda x: x.uploaded_at, reverse=True)
+    # Split into receiving (unsigned) and settled (signed)
+    receiving_invoices = [inv for inv in invoices if not inv.signed]
+    settled_invoices = [inv for inv in invoices if inv.signed]
     return render_template('invoices.html',
                          invoices=invoices,
+                         receiving_invoices=receiving_invoices,
+                         settled_invoices=settled_invoices,
                          vendors=vendors,
                          tesseract_available=is_tesseract_available())
 
@@ -1308,7 +1406,10 @@ def upload_invoice():
         # Try to match line items to inventory
         inventory_items = data_store.load_inventory()
         invoice = invoice_parser.match_to_inventory(invoice, inventory_items)
-        
+
+        # Cross-reference against submitted vendor orders
+        _match_invoice_to_order(invoice)
+
         # Save
         invoice_manager.add_invoice(invoice)
         
@@ -1342,7 +1443,10 @@ def manual_invoice():
     # Try to match
     inventory_items = data_store.load_inventory()
     invoice = invoice_parser.match_to_inventory(invoice, inventory_items)
-    
+
+    # Cross-reference against submitted vendor orders
+    _match_invoice_to_order(invoice)
+
     invoice_manager.add_invoice(invoice)
     flash(f'Invoice created: {invoice.item_count} items parsed', 'success')
     return redirect(url_for('review_invoice', invoice_id=invoice.id))
@@ -1359,11 +1463,18 @@ def review_invoice(invoice_id):
     
     inventory_items = data_store.load_inventory()
     vendors = vendor_manager.get_all_vendors()
-    
+
+    # Load matched order if any
+    matched_order = None
+    if invoice.matched_order_id:
+        all_vendor_orders = vendor_order_manager._load_all_orders()
+        matched_order = next((o for o in all_vendor_orders if o.id == invoice.matched_order_id), None)
+
     return render_template('invoice_review.html',
                          invoice=invoice,
                          inventory_items=inventory_items,
-                         vendors=vendors)
+                         vendors=vendors,
+                         matched_order=matched_order)
 
 
 @app.route('/invoices/<invoice_id>/match', methods=['POST'])
@@ -1477,6 +1588,34 @@ def delete_invoice(invoice_id):
     invoice_manager.delete_invoice(invoice_id)
     flash('Invoice deleted', 'success')
     return redirect(url_for('invoices_page'))
+
+
+@app.route('/invoices/<invoice_id>/sign', methods=['POST'])
+@login_required
+def sign_invoice(invoice_id):
+    """Mark an invoice as signed (moves to settled)"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    invoice.signed = True
+    invoice_manager.update_invoice(invoice)
+    flash('Invoice signed and moved to Settled.', 'success')
+    return redirect(url_for('review_invoice', invoice_id=invoice_id))
+
+
+@app.route('/invoices/<invoice_id>/unsign', methods=['POST'])
+@login_required
+def unsign_invoice(invoice_id):
+    """Remove signature from invoice (moves back to receiving)"""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+    invoice.signed = False
+    invoice_manager.update_invoice(invoice)
+    flash('Signature removed — invoice moved back to Receiving.', 'success')
+    return redirect(url_for('review_invoice', invoice_id=invoice_id))
 
 
 # ============ Ordering Interface Routes ============
