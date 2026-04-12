@@ -141,7 +141,7 @@
                     <div class="day-date">{{ day.date.strftime('%m/%d') }}</div>
                 </th>
                 {% endfor %}
-                <th class="totals-col">TOTALS</th>
+                <th class="totals-col">HRS</th>
             </tr>
         </thead>
         <tbody>
@@ -151,7 +151,7 @@
                 {% for day_shift in emp.shifts %}
                 <td>{{ day_shift.display }}</td>
                 {% endfor %}
-                <td class="totals-col">{{ emp.total_hours|int }}</td>
+                <td class="totals-col">{{ "%.1f"|format(emp.total_hours) }}</td>
             </tr>
             {% endfor %}
         </tbody>

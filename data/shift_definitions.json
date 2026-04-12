@@ -1,0 +1,38 @@
+{
+  "opening": {
+    "name": "Opening",
+    "start": "05:00",
+    "end": "13:30",
+    "station": "OP"
+  },
+  "bar": {
+    "name": "Bar",
+    "start": "05:00",
+    "end": "13:30",
+    "station": "BAR"
+  },
+  "fruit": {
+    "name": "Fruit",
+    "start": "06:00",
+    "end": "14:30",
+    "station": "FR"
+  },
+  "mid": {
+    "name": "Mid-Day",
+    "start": "09:30",
+    "end": "18:00",
+    "station": "MID"
+  },
+  "pm": {
+    "name": "PM",
+    "start": "11:00",
+    "end": "19:30",
+    "station": "PM"
+  },
+  "closing": {
+    "name": "Closing",
+    "start": "13:00",
+    "end": "21:30",
+    "station": "CL"
+  }
+}

@@ -20,6 +20,7 @@
             <li><a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}">👥 Employees</a></li>
             <li><a href="{{ url_for('orders_inventory') }}" class="{% if request.endpoint in ['orders_inventory', 'ordering'] %}active{% endif %}">📦 Orders</a></li>
             <li><a href="{{ url_for('invoices_page') }}" class="{% if request.endpoint == 'invoices_page' %}active{% endif %}">🧾 Invoices</a></li>
+            <li><a href="{{ url_for('shifts_page') }}" class="{% if request.endpoint == 'shifts_page' %}active{% endif %}">🕐 Shifts</a></li>
             <li class="nav-user-mobile">
                 <span>{{ session.user.display_role or session.user.name }}</span>
                 <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">Logout</a>

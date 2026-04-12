@@ -9,6 +9,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -21,6 +22,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -33,6 +35,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -45,6 +48,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -57,6 +61,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -69,6 +74,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -81,6 +87,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -93,6 +100,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -105,6 +113,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -117,6 +126,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -129,6 +139,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -141,6 +152,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -153,6 +165,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -165,6 +178,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -177,6 +191,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -189,6 +204,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -201,6 +217,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -213,6 +230,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -225,6 +243,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -237,6 +256,7 @@
     "station": "CK",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -249,6 +269,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -261,6 +282,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -273,6 +295,7 @@
     "station": "CK",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -285,6 +308,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -297,6 +321,7 @@
     "station": "MEAT",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -309,6 +334,7 @@
     "station": "MEAT",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -321,6 +347,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -333,6 +360,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -345,6 +373,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -357,6 +386,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -369,6 +399,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -381,6 +412,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -393,6 +425,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -405,6 +438,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -417,6 +451,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -429,6 +464,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -441,6 +477,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -453,6 +490,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -465,6 +503,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -477,6 +516,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -489,6 +529,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -501,6 +542,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -513,6 +555,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -525,6 +568,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -537,6 +581,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -549,6 +594,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -561,6 +607,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -573,6 +620,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -585,6 +633,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -597,6 +646,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -609,6 +659,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -621,6 +672,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -633,6 +685,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -645,6 +698,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -657,6 +711,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -669,6 +724,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -681,6 +737,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -693,6 +750,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -705,6 +763,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -717,6 +776,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -729,6 +789,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -741,6 +802,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -753,6 +815,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -765,6 +828,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -777,6 +841,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -789,6 +854,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -801,6 +867,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -813,6 +880,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -825,6 +893,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -837,6 +906,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -849,6 +919,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -861,6 +932,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -873,6 +945,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -885,6 +958,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -897,6 +971,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -909,6 +984,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -921,6 +997,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -933,6 +1010,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -945,6 +1023,7 @@
     "station": "MID",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -957,6 +1036,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -969,6 +1049,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -981,6 +1062,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -993,6 +1075,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1005,6 +1088,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1017,6 +1101,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1029,6 +1114,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1041,6 +1127,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1053,6 +1140,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1065,6 +1153,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1077,6 +1166,7 @@
     "station": "CK",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1089,6 +1179,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1101,6 +1192,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1113,6 +1205,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1125,6 +1218,7 @@
     "station": "CK",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1137,6 +1231,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1149,6 +1244,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1161,6 +1257,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1173,6 +1270,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1185,6 +1283,7 @@
     "station": "MEAT",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1197,6 +1296,7 @@
     "station": "MEAT",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1209,6 +1309,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1221,6 +1322,7 @@
     "station": "BAR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1233,6 +1335,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1245,6 +1348,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1257,6 +1361,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1269,6 +1374,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1281,6 +1387,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1293,6 +1400,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1305,6 +1413,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1317,6 +1426,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1329,6 +1439,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1341,6 +1452,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1353,6 +1465,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1365,6 +1478,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1377,6 +1491,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1389,6 +1504,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1401,6 +1517,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1413,6 +1530,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1425,6 +1543,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1437,6 +1556,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1449,6 +1569,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1461,6 +1582,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1473,6 +1595,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1485,6 +1608,7 @@
     "station": "FR",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1497,6 +1621,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1509,6 +1634,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1521,6 +1647,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1533,6 +1660,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1545,6 +1673,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1557,6 +1686,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1569,6 +1699,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1581,6 +1712,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1593,6 +1725,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1605,6 +1738,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1617,6 +1751,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1629,6 +1764,7 @@
     "station": "OP",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1641,6 +1777,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1653,6 +1790,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1665,6 +1803,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1677,6 +1816,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1689,6 +1829,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1701,6 +1842,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1713,6 +1855,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1725,6 +1868,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1737,6 +1881,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1749,6 +1894,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1761,6 +1907,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1773,6 +1920,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1785,6 +1933,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1797,6 +1946,7 @@
     "station": "",
     "is_off": false,
     "is_request_off": true,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1809,6 +1959,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1821,6 +1972,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1833,6 +1985,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1845,6 +1998,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1857,6 +2011,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1869,6 +2024,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1881,6 +2037,7 @@
     "station": "PM",
     "is_off": false,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1893,6 +2050,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   },
   {
@@ -1905,6 +2063,7 @@
     "station": "",
     "is_off": true,
     "is_request_off": false,
+    "custom_text": "",
     "notes": ""
   }
 ]

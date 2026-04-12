@@ -30,6 +30,7 @@ class DataStore:
         self.usage_file = self.data_dir / "usage_log.json"
         self.inventory_counts_file = self.data_dir / "inventory_counts.json"
         self.shift_presets_file = self.data_dir / "shift_presets.json"
+        self.shift_definitions_file = self.data_dir / "shift_definitions.json"
     
     # ========== Employee Operations ==========
     
@@ -298,6 +299,28 @@ class DataStore:
         if isinstance(data, list):
             return {}
         return data if data else {}
+
+    # ========== Shift Definitions Operations ==========
+
+    DEFAULT_SHIFT_DEFINITIONS = {
+        'opening': {'name': 'Opening', 'start': '05:00', 'end': '13:30', 'station': 'OP'},
+        'bar': {'name': 'Bar', 'start': '05:00', 'end': '13:30', 'station': 'BAR'},
+        'fruit': {'name': 'Fruit', 'start': '06:00', 'end': '14:30', 'station': 'FR'},
+        'mid': {'name': 'Mid-Day', 'start': '09:30', 'end': '18:00', 'station': 'MID'},
+        'pm': {'name': 'PM', 'start': '12:00', 'end': '20:30', 'station': 'PM'},
+        'closing': {'name': 'Closing', 'start': '13:00', 'end': '21:30', 'station': ''},
+    }
+
+    def save_shift_definitions(self, definitions: dict):
+        """Save shift definitions to JSON file"""
+        self._write_json(self.shift_definitions_file, definitions)
+
+    def load_shift_definitions(self) -> dict:
+        """Load shift definitions from JSON file, returning defaults if empty"""
+        data = self._read_json(self.shift_definitions_file)
+        if not data or isinstance(data, list):
+            return dict(self.DEFAULT_SHIFT_DEFINITIONS)
+        return data
 
     # ========== Helper Methods ==========
     

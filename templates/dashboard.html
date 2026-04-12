@@ -9,37 +9,6 @@
         <p class="date">{{ today.strftime('%A, %B %d, %Y') }} - {{ current_time.strftime('%I:%M %p') }}</p>
     </div>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-info">
-                <h3>{{ total_employees }}</h3>
-                <p>Total Employees</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">📅</div>
-            <div class="stat-info">
-                <h3>{{ today_shifts|length }}</h3>
-                <p>Shifts Today</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">🟢</div>
-            <div class="stat-info">
-                <h3>{{ on_duty|length }}</h3>
-                <p>Currently On Duty</p>
-            </div>
-        </div>
-        <div class="stat-card {% if low_stock|length > 0 %}alert-card{% endif %}">
-            <div class="stat-icon">⚠️</div>
-            <div class="stat-info">
-                <h3>{{ low_stock|length }}</h3>
-                <p>Low Stock Items</p>
-            </div>
-        </div>
-    </div>
-
     <div class="dashboard-grid">
         <div class="card">
             <div class="card-header">
@@ -82,51 +51,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h3>⚠️ Low Stock Alert</h3>
-                <a href="{{ url_for('orders') }}" class="btn btn-sm">Create Orders</a>
-            </div>
-            <div class="card-body">
-                {% if low_stock %}
-                <ul class="alert-list">
-                    {% for item in low_stock[:5] %}
-                    <li class="alert-item">
-                        <span class="item-name">{{ item.name }}</span>
-                        <span class="item-qty">{{ item.quantity }} / {{ item.min_quantity }} {{ item.unit }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% if low_stock|length > 5 %}
-                <p class="more-link">+ {{ low_stock|length - 5 }} more items</p>
-                {% endif %}
-                {% else %}
-                <p class="empty-state success">✓ All items are stocked</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h3>🟢 Currently On Duty</h3>
-            </div>
-            <div class="card-body">
-                {% if on_duty %}
-                <ul class="staff-list">
-                    {% for shift in on_duty %}
-                    <li>
-                        <span class="staff-name">{{ shift.employee_name }}</span>
-                        <span class="staff-time">until {{ shift.end_time.strftime('%I:%M %p') }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p class="empty-state">No staff currently on duty</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h3>📊 This Week</h3>
+                <h3>📊 Hours This Week</h3>
             </div>
             <div class="card-body">
                 <div class="week-summary">

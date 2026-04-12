@@ -66,6 +66,11 @@ function confirmDelete(message) {
 // Close modal when clicking outside
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal')) {
+        // For presets modal, use its own close function to auto-save
+        if (e.target.id === 'presetsModal' && typeof closePresetsModal === 'function') {
+            closePresetsModal();
+            return;
+        }
         e.target.classList.remove('active');
     }
 });
@@ -73,6 +78,12 @@ document.addEventListener('click', function(e) {
 // Close modal with Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
+        // For presets modal, use its own close function to auto-save
+        const presetsModal = document.getElementById('presetsModal');
+        if (presetsModal && presetsModal.classList.contains('active') && typeof closePresetsModal === 'function') {
+            closePresetsModal();
+            return;
+        }
         document.querySelectorAll('.modal.active').forEach(modal => {
             modal.classList.remove('active');
         });

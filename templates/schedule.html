@@ -50,7 +50,7 @@
                             <div class="day-date">{{ day.date.strftime('%m/%d') }}</div>
                         </th>
                         {% endfor %}
-                        <th class="totals-col">TOTALS</th>
+                        <th class="totals-col">HRS</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,7 +64,7 @@
                             {{ day_shift.display }}
                         </td>
                         {% endfor %}
-                        <td class="totals-col">{{ emp.total_hours|int }}</td>
+                        <td class="totals-col">{{ "%.1f"|format(emp.total_hours) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -104,29 +104,18 @@
                     <label>Shift Type</label>
                     <select name="shift_type" id="edit-shift-type" onchange="toggleShiftFields()">
                         <option value="preset">-- Quick Select --</option>
-                        <option value="opening">Opening / Salad Bar (5AM-1:30PM)</option>
-                        <option value="mid">Mid-Day (9:30AM-6PM)</option>
-                        <option value="pm">PM (12PM-8:30PM)</option>
-                        <option value="closing">Closing (1PM-9:30PM)</option>
+                        {% for key, d in shift_definitions.items() %}
+                        {% set sh = d.start.split(':') %}
+                        {% set eh = d.end.split(':') %}
+                        {% set s_h = sh[0]|int %}
+                        {% set e_h = eh[0]|int %}
+                        <option value="{{ key }}">{{ d.name }} ({{ '%d:%s%s'|format(s_h if s_h <= 12 else s_h - 12, sh[1], 'AM' if s_h < 12 else 'PM') }}-{{ '%d:%s%s'|format(e_h if e_h <= 12 else e_h - 12, eh[1], 'AM' if e_h < 12 else 'PM') }})</option>
+                        {% endfor %}
                         <option value="off">OFF (Day Off)</option>
                         <option value="ro">R/O (Request Off)</option>
-                        <option value="custom">Custom Time</option>
                         <option value="custom_text">Custom Shift (type your own)</option>
                         <option value="clear">Clear / No Shift</option>
                     </select>
-                </div>
-
-                <div id="custom-shift-fields" style="display:none;">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Start Time</label>
-                            <input type="time" name="start_time" id="edit-start-time">
-                        </div>
-                        <div class="form-group">
-                            <label>End Time</label>
-                            <input type="time" name="end_time" id="edit-end-time">
-                        </div>
-                    </div>
                 </div>
 
                 <div id="custom-text-field" style="display:none;">
@@ -232,13 +221,13 @@
                     <thead>
                         <tr>
                             <th class="name-col">Employee</th>
-                            <th>MON</th>
-                            <th>TUE</th>
-                            <th>WED</th>
-                            <th>THU</th>
-                            <th>FRI</th>
-                            <th>SAT</th>
-                            <th>SUN</th>
+                            <th data-day="0">MON</th>
+                            <th data-day="1">TUE</th>
+                            <th data-day="2">WED</th>
+                            <th data-day="3">THU</th>
+                            <th data-day="4">FRI</th>
+                            <th data-day="5">SAT</th>
+                            <th data-day="6">SUN</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -246,7 +235,7 @@
                         <tr data-emp-id="{{ emp.id }}" data-emp-name="{{ emp.name }}">
                             <td class="name-col">{{ emp.name }}</td>
                             {% for d in range(7) %}
-                            <td class="preset-cell" data-day="{{ d }}" onclick="cyclePreset(this)">
+                            <td class="preset-cell" data-day="{{ d }}">
                                 <span class="preset-label">-</span>
                             </td>
                             {% endfor %}
@@ -256,15 +245,19 @@
                 </table>
             </div>
             <div class="preset-legend">
-                <span class="legend-item"><span class="preset-chip preset-opening">OP/BAR</span> Opening 5-1:30</span>
+                <span class="legend-item"><span class="preset-chip preset-opening">OP</span> Opening 5-1:30</span>
+                <span class="legend-item"><span class="preset-chip preset-bar">BAR</span> Bar 5-1:30</span>
+                <span class="legend-item"><span class="preset-chip preset-fruit">FR</span> Fruit 6-2:30</span>
                 <span class="legend-item"><span class="preset-chip preset-mid">MID</span> 9:30-6</span>
                 <span class="legend-item"><span class="preset-chip preset-pm">PM</span> 12-8:30</span>
                 <span class="legend-item"><span class="preset-chip preset-closing">CL</span> 1-9:30</span>
+                <span class="legend-item"><span class="preset-chip preset-custom">CUST</span> Custom</span>
                 <span class="legend-item"><span class="preset-chip preset-off">OFF</span></span>
             </div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="closePresetsModal()">Cancel</button>
+            <button type="button" class="btn btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="clearAllPresets()">Clear All Presets</button>
             <form method="POST" action="{{ url_for('apply_shift_presets') }}" style="display:inline;">
                 <input type="hidden" name="week_offset" value="{{ week_offset }}">
                 <button type="submit" class="btn btn-info" onclick="savePresetsBeforeApply(event)">Apply to Week</button>
@@ -544,6 +537,7 @@
 .presets-table-container {
     overflow-x: auto;
     margin-bottom: 15px;
+    position: relative;
 }
 
 .preset-cell {
@@ -553,16 +547,87 @@
     transition: background 0.15s;
     user-select: none;
     color: #374151 !important;
+    position: relative;
 }
 
 .preset-cell:hover {
     background: #e5e7eb !important;
 }
 
+/* Today highlight in presets table */
+.presets-table th.preset-today {
+    background: #dc2626 !important;
+    color: white !important;
+}
+.preset-cell.preset-today-cell {
+    border-left: 2px solid #dc2626 !important;
+    border-right: 2px solid #dc2626 !important;
+}
+.presets-table tbody tr:last-child .preset-today-cell {
+    border-bottom: 2px solid #dc2626 !important;
+}
+
+/* Preset dropdown */
+.preset-dropdown {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: 200;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    min-width: 200px;
+    white-space: nowrap;
+    display: none;
+}
+
+.preset-dropdown.open {
+    display: block;
+}
+
+.preset-dropdown-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 7px 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.12s;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.preset-dropdown-item:hover {
+    background: #f3f4f6;
+}
+
+.preset-dropdown-item .pd-chip {
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.preset-dropdown-item.pd-active {
+    background: #e5e7eb;
+}
+
 .preset-cell[data-type="opening"] { background: #dbeafe !important; color: #1e40af !important; font-weight: 600; }
+.preset-cell[data-type="bar"] { background: #bfdbfe !important; color: #1e3a8a !important; font-weight: 600; }
+.preset-cell[data-type="fruit"] { background: #fce7f3 !important; color: #9d174d !important; font-weight: 600; }
 .preset-cell[data-type="mid"] { background: #d1fae5 !important; color: #065f46 !important; font-weight: 600; }
 .preset-cell[data-type="pm"] { background: #fef3c7 !important; color: #92400e !important; font-weight: 600; }
 .preset-cell[data-type="closing"] { background: #e0e7ff !important; color: #3730a3 !important; font-weight: 600; }
+.preset-cell[data-type="custom"] { background: #f3e8ff !important; color: #6b21a8 !important; font-weight: 600; }
 .preset-cell[data-type="off"] { background: #fee2e2 !important; color: #991b1b !important; font-weight: 600; }
 
 .preset-legend {
@@ -584,10 +649,17 @@
 }
 
 .preset-opening { background: #dbeafe; color: #1e40af; }
+.preset-bar { background: #bfdbfe; color: #1e3a8a; }
+.preset-fruit { background: #fce7f3; color: #9d174d; }
 .preset-mid { background: #d1fae5; color: #065f46; }
 .preset-pm { background: #fef3c7; color: #92400e; }
 .preset-closing { background: #e0e7ff; color: #3730a3; }
+.preset-custom { background: #f3e8ff; color: #6b21a8; }
 .preset-off { background: #fee2e2; color: #991b1b; }
+/* Fallback for dynamically added shift definitions */
+[class*="preset-"]:not(.preset-opening):not(.preset-bar):not(.preset-fruit):not(.preset-mid):not(.preset-pm):not(.preset-closing):not(.preset-custom):not(.preset-off) {
+    background: #e5e7eb; color: #374151;
+}
 
 .ocr-info {
     background: #f0f9ff;
@@ -679,6 +751,10 @@ input[type="file"]:hover {
         display: none !important;
     }
     
+    .today-col {
+        background: inherit !important;
+    }
+    
     .shift-cell {
         cursor: default;
     }
@@ -717,13 +793,8 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Preset shift times
-const SHIFT_PRESETS = {
-    'opening': { start: '05:00', end: '13:30', station: 'BAR' },
-    'mid': { start: '09:30', end: '18:00', station: 'MID' },
-    'pm': { start: '12:00', end: '20:30', station: 'PM' },
-    'closing': { start: '13:00', end: '21:30', station: '' }
-};
+// Preset shift times (loaded from shift definitions)
+const SHIFT_PRESETS = {{ shift_definitions | tojson }};
 
 function openEditShift(empId, empName, date, currentShift, shiftId) {
     document.getElementById('edit-emp-id').value = empId;
@@ -734,8 +805,6 @@ function openEditShift(empId, empName, date, currentShift, shiftId) {
     
     // Reset form
     document.getElementById('edit-shift-type').value = 'preset';
-    document.getElementById('edit-start-time').value = '';
-    document.getElementById('edit-end-time').value = '';
     document.getElementById('edit-station').value = '';
     document.getElementById('edit-custom-text').value = '';
     
@@ -754,30 +823,20 @@ function openEditShift(empId, empName, date, currentShift, shiftId) {
 
 function toggleShiftFields() {
     const shiftType = document.getElementById('edit-shift-type').value;
-    const customFields = document.getElementById('custom-shift-fields');
     const stationField = document.getElementById('station-field');
     const customTextField = document.getElementById('custom-text-field');
     
     // Handle preset shifts
     if (SHIFT_PRESETS[shiftType]) {
         const preset = SHIFT_PRESETS[shiftType];
-        document.getElementById('edit-start-time').value = preset.start;
-        document.getElementById('edit-end-time').value = preset.end;
         document.getElementById('edit-station').value = preset.station;
-        customFields.style.display = 'none';
-        stationField.style.display = 'block';
-        customTextField.style.display = 'none';
-    } else if (shiftType === 'custom') {
-        customFields.style.display = 'block';
         stationField.style.display = 'block';
         customTextField.style.display = 'none';
     } else if (shiftType === 'custom_text') {
-        customFields.style.display = 'none';
         stationField.style.display = 'none';
         customTextField.style.display = 'block';
     } else {
         // off, ro, clear
-        customFields.style.display = 'none';
         stationField.style.display = 'none';
         customTextField.style.display = 'none';
     }
@@ -827,32 +886,259 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ========== Presets Logic ==========
-const PRESET_CYCLE = ['', 'opening', 'mid', 'pm', 'closing', 'off'];
-const PRESET_LABELS = {
-    '': '-',
-    'opening': 'OP/BAR',
-    'mid': 'MID',
-    'pm': 'PM',
-    'closing': 'CL',
-    'off': 'OFF'
-};
+// ========== Presets Logic (dynamic from shift definitions) ==========
+const _shiftDefs = {{ shift_definitions | tojson }};
+const PRESET_CYCLE = [''].concat(Object.keys(_shiftDefs)).concat(['custom', 'off']);
+const PRESET_LABELS = {'': '-', 'custom': 'CUST', 'off': 'OFF'};
+const PRESET_DESCRIPTIONS = {'': 'Clear', 'custom': 'Custom (type your own)', 'off': 'OFF'};
+const PRESET_CHIP_CLASSES = {'': '', 'custom': 'preset-custom', 'off': 'preset-off'};
+Object.keys(_shiftDefs).forEach(function(key) {
+    var d = _shiftDefs[key];
+    PRESET_LABELS[key] = d.station || d.name.substring(0, 3).toUpperCase();
+    // Format times for description: "05:00" -> "5AM", "13:30" -> "1:30PM"
+    function fmtTime(t) {
+        var p = t.split(':'), h = parseInt(p[0]), m = p[1];
+        var ampm = h < 12 ? 'AM' : 'PM';
+        if (h === 0) h = 12;
+        else if (h > 12) h -= 12;
+        return m === '00' ? h + ampm : h + ':' + m + ampm;
+    }
+    PRESET_DESCRIPTIONS[key] = d.name + ' ' + fmtTime(d.start) + '-' + fmtTime(d.end);
+    PRESET_CHIP_CLASSES[key] = 'preset-' + key;
+});
+
+// --- Dropdown creation ---
+let activeDropdown = null;
+
+function createPresetDropdown(cell) {
+    closePresetDropdown();
+    const current = cell.getAttribute('data-type') || '';
+    const dropdown = document.createElement('div');
+    dropdown.className = 'preset-dropdown open';
+    PRESET_CYCLE.forEach(type => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preset-dropdown-item' + (type === current ? ' pd-active' : '');
+        const chipClass = PRESET_CHIP_CLASSES[type];
+        const chipLabel = type ? PRESET_LABELS[type] : '—';
+        const desc = PRESET_DESCRIPTIONS[type];
+        btn.innerHTML = (chipClass ? '<span class="pd-chip ' + chipClass + '">' + chipLabel + '</span>' : '<span class="pd-chip" style="background:#e5e7eb;">—</span>') + ' ' + desc;
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (type === 'custom') {
+                const existing = cell.getAttribute('data-custom-text') || getRowCustomText(cell);
+                if (existing) {
+                    // Stamp existing custom text without prompting
+                    cell.setAttribute('data-type', 'custom');
+                    cell.setAttribute('data-custom-text', existing);
+                    cell.querySelector('.preset-label').textContent = existing;
+                    closePresetDropdown();
+                } else {
+                    closePresetDropdown();
+                    promptCustomPreset(cell);
+                }
+            } else {
+                cell.setAttribute('data-type', type);
+                cell.removeAttribute('data-custom-text');
+                cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
+                closePresetDropdown();
+            }
+        });
+        dropdown.appendChild(btn);
+    });
+
+    // Add "Edit Custom" option if custom text already exists for this row
+    const rowCustom = cell.getAttribute('data-custom-text') || getRowCustomText(cell);
+    if (rowCustom) {
+        const divider = document.createElement('div');
+        divider.style.cssText = 'height:1px;background:#e5e7eb;margin:2px 0;';
+        dropdown.appendChild(divider);
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'preset-dropdown-item';
+        editBtn.innerHTML = '<span class="pd-chip preset-custom">✎</span> Edit Custom...';
+        editBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            closePresetDropdown();
+            promptCustomPreset(cell);
+        });
+        dropdown.appendChild(editBtn);
+    }
+
+    cell.appendChild(dropdown);
+    activeDropdown = dropdown;
+}
+
+function closePresetDropdown() {
+    if (activeDropdown) {
+        activeDropdown.remove();
+        activeDropdown = null;
+    }
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    if (activeDropdown && !e.target.closest('.preset-cell')) {
+        closePresetDropdown();
+    }
+});
+
+// --- Tap / click to cycle ---
+function getRowCustomText(cell) {
+    // Find existing custom text from any cell in the same employee row
+    const row = cell.closest('tr');
+    const siblings = row.querySelectorAll('.preset-cell[data-custom-text]');
+    for (const sib of siblings) {
+        const t = sib.getAttribute('data-custom-text');
+        if (t) return t;
+    }
+    return '';
+}
 
 function cyclePreset(cell) {
     const current = cell.getAttribute('data-type') || '';
     const idx = PRESET_CYCLE.indexOf(current);
     const next = PRESET_CYCLE[(idx + 1) % PRESET_CYCLE.length];
-    cell.setAttribute('data-type', next);
-    cell.querySelector('.preset-label').textContent = PRESET_LABELS[next];
+    if (next === 'custom') {
+        const existing = cell.getAttribute('data-custom-text') || getRowCustomText(cell);
+        if (existing) {
+            cell.setAttribute('data-type', 'custom');
+            cell.setAttribute('data-custom-text', existing);
+            cell.querySelector('.preset-label').textContent = existing;
+        } else {
+            promptCustomPreset(cell);
+        }
+    } else {
+        cell.setAttribute('data-type', next);
+        cell.querySelector('.preset-label').textContent = PRESET_LABELS[next];
+    }
+}
+
+function promptCustomPreset(cell) {
+    const existing = cell.getAttribute('data-custom-text') || getRowCustomText(cell);
+    const text = prompt('Enter custom shift label (e.g. 6-2 BAR, Training):', existing);
+    if (text !== null && text.trim()) {
+        const newText = text.trim();
+        cell.setAttribute('data-type', 'custom');
+        cell.setAttribute('data-custom-text', newText);
+        cell.querySelector('.preset-label').textContent = newText;
+        // Update all other custom cells in the same row to the new text
+        const row = cell.closest('tr');
+        row.querySelectorAll('.preset-cell').forEach(sib => {
+            if (sib !== cell && sib.getAttribute('data-type') === 'custom') {
+                sib.setAttribute('data-custom-text', newText);
+                sib.querySelector('.preset-label').textContent = newText;
+            }
+        });
+    } else if (text !== null) {
+        // User cleared it — skip custom, move to off
+        cell.setAttribute('data-type', 'off');
+        cell.removeAttribute('data-custom-text');
+        cell.querySelector('.preset-label').textContent = 'OFF';
+    }
+}
+
+// --- Attach events to preset cells ---
+function attachPresetCellEvents() {
+    const cells = document.querySelectorAll('#presetsTable .preset-cell');
+    cells.forEach(cell => {
+        let holdTimer = null;
+        let didLongPress = false;
+        let clickTimer = null;
+
+        // Single click/tap = cycle (delayed to distinguish from dblclick)
+        cell.addEventListener('click', function(e) {
+            if (activeDropdown && activeDropdown.parentElement === cell) return;
+            if (didLongPress) { didLongPress = false; return; }
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(function() {
+                cyclePreset(cell);
+            }, 250);
+        });
+
+        // Double-click (desktop) = dropdown
+        cell.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            clearTimeout(clickTimer);
+            createPresetDropdown(cell);
+        });
+
+        // Long-press (mobile) = dropdown
+        cell.addEventListener('touchstart', function(e) {
+            didLongPress = false;
+            holdTimer = setTimeout(function() {
+                didLongPress = true;
+                createPresetDropdown(cell);
+            }, 500);
+        }, { passive: true });
+
+        cell.addEventListener('touchend', function() {
+            clearTimeout(holdTimer);
+        });
+
+        cell.addEventListener('touchmove', function() {
+            clearTimeout(holdTimer);
+        });
+    });
+}
+
+// --- Today highlighting in presets table ---
+function highlightPresetToday() {
+    // JS getDay(): 0=Sun, need 0=Mon for our table
+    const jsDay = new Date().getDay();
+    const dayIndex = jsDay === 0 ? 6 : jsDay - 1; // convert to 0=Mon...6=Sun
+
+    // Highlight header
+    const headers = document.querySelectorAll('#presetsTable thead th[data-day]');
+    headers.forEach(th => {
+        th.classList.toggle('preset-today', parseInt(th.getAttribute('data-day')) === dayIndex);
+    });
+
+    // Highlight body cells
+    const cells = document.querySelectorAll('#presetsTable .preset-cell');
+    cells.forEach(cell => {
+        cell.classList.toggle('preset-today-cell', parseInt(cell.getAttribute('data-day')) === dayIndex);
+    });
 }
 
 function openPresetsModal() {
     document.getElementById('presetsModal').classList.add('active');
     loadPresets();
+    highlightPresetToday();
+    attachPresetCellEvents();
 }
 
 function closePresetsModal() {
+    // Auto-save presets when closing the modal
+    const presets = gatherPresetsData();
+    fetch('{{ url_for("save_shift_presets") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(presets)
+    });
     document.getElementById('presetsModal').classList.remove('active');
+}
+
+function clearAllPresets() {
+    if (!confirm('Clear all shift presets for every employee?')) return;
+    const rows = document.querySelectorAll('#presetsTable tbody tr');
+    rows.forEach(row => {
+        row.querySelectorAll('.preset-cell').forEach(cell => {
+            cell.setAttribute('data-type', '');
+            cell.removeAttribute('data-custom-text');
+            cell.querySelector('.preset-label').textContent = '-';
+        });
+    });
+    // Save empty presets to server
+    fetch('{{ url_for("save_shift_presets") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            alert('All presets cleared!');
+        }
+    });
 }
 
 function loadPresets() {
@@ -867,8 +1153,15 @@ function loadPresets() {
                     const day = cell.getAttribute('data-day');
                     const preset = (presets[empId] && presets[empId][day]) || {};
                     const type = preset.shift_type || '';
+                    const customText = preset.custom_text || '';
                     cell.setAttribute('data-type', type);
-                    cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
+                    if (type === 'custom' && customText) {
+                        cell.setAttribute('data-custom-text', customText);
+                        cell.querySelector('.preset-label').textContent = customText;
+                    } else {
+                        cell.removeAttribute('data-custom-text');
+                        cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
+                    }
                 });
             });
         });
@@ -886,7 +1179,11 @@ function gatherPresetsData() {
             const day = cell.getAttribute('data-day');
             const type = cell.getAttribute('data-type') || '';
             if (type) {
-                empPresets[day] = { shift_type: type, station: '' };
+                const entry = { shift_type: type, station: '' };
+                if (type === 'custom') {
+                    entry.custom_text = cell.getAttribute('data-custom-text') || '';
+                }
+                empPresets[day] = entry;
                 hasAny = true;
             }
         });

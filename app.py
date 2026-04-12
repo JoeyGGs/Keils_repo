@@ -32,6 +32,19 @@ invoice_manager = InvoiceManager()
 invoice_parser = InvoiceOCRParser()
 
 
+def _build_shift_presets():
+    """Build SHIFT_PRESETS dict from stored definitions: {key: (start_time, end_time, station)}"""
+    defs = data_store.load_shift_definitions()
+    presets = {}
+    for key, d in defs.items():
+        parts_s = d['start'].split(':')
+        parts_e = d['end'].split(':')
+        presets[key] = (time(int(parts_s[0]), int(parts_s[1])),
+                        time(int(parts_e[0]), int(parts_e[1])),
+                        d.get('station', ''))
+    return presets
+
+
 def login_required(f):
     """Decorator to require login"""
     @wraps(f)
@@ -221,7 +234,8 @@ def schedule():
                          employees=employees,
                          schedule_data=schedule_data,
                          grand_total=grand_total,
-                         today=today)
+                         today=today,
+                         shift_definitions=data_store.load_shift_definitions())
 
 
 @app.route('/schedule/print')
@@ -295,13 +309,7 @@ def update_shift():
     old_shift_id = request.form.get('old_shift_id')
     week_offset = request.form.get('week_offset', 0)
     
-    # Preset shift times
-    SHIFT_PRESETS = {
-        'opening': (time(5, 0), time(13, 30), 'BAR'),
-        'mid': (time(9, 30), time(18, 0), 'MID'),
-        'pm': (time(12, 0), time(20, 30), 'PM'),
-        'closing': (time(13, 0), time(21, 30), '')
-    }
+    SHIFT_PRESETS = _build_shift_presets()
     
     shifts = data_store.load_shifts()
     
@@ -349,26 +357,6 @@ def update_shift():
             station=station
         )
         shifts.append(new_shift)
-    elif shift_type == 'custom':
-        start_str = request.form.get('start_time')
-        end_str = request.form.get('end_time')
-        station = request.form.get('station', '')
-        
-        if start_str and end_str:
-            start_time = datetime.strptime(start_str, '%H:%M').time()
-            end_time = datetime.strptime(end_str, '%H:%M').time()
-            
-            shift_id = f"SH{employee_id}_{shift_date.isoformat()}"
-            new_shift = Shift(
-                id=shift_id,
-                employee_id=employee_id,
-                employee_name=employee_name,
-                date=shift_date,
-                start_time=start_time,
-                end_time=end_time,
-                station=station
-            )
-            shifts.append(new_shift)
     elif shift_type == 'custom_text':
         custom_text = request.form.get('custom_text', '').strip()
         if custom_text:
@@ -405,12 +393,7 @@ def create_new_schedule():
     employees = data_store.load_employees()
     shifts = data_store.load_shifts()
 
-    SHIFT_PRESETS = {
-        'opening': (time(5, 0), time(13, 30), 'BAR'),
-        'mid': (time(9, 30), time(18, 0), 'MID'),
-        'pm': (time(12, 0), time(20, 30), 'PM'),
-        'closing': (time(13, 0), time(21, 30), ''),
-    }
+    SHIFT_PRESETS = _build_shift_presets()
 
     applied = 0
     for emp in employees:
@@ -423,6 +406,7 @@ def create_new_schedule():
             shift_date = next_week_start + timedelta(days=day_index)
             shift_type = preset_info.get('shift_type', '')
             station = preset_info.get('station', '')
+            custom_text = preset_info.get('custom_text', '')
 
             if not shift_type:
                 continue
@@ -436,6 +420,8 @@ def create_new_schedule():
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_off=True)
             elif shift_type == 'ro':
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_request_off=True)
+            elif shift_type == 'custom' and custom_text:
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, custom_text=custom_text)
             elif shift_type in SHIFT_PRESETS:
                 start_t, end_t, default_station = SHIFT_PRESETS[shift_type]
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date,
@@ -516,12 +502,7 @@ def apply_shift_presets():
     employees = data_store.load_employees()
     shifts = data_store.load_shifts()
 
-    SHIFT_PRESETS = {
-        'opening': (time(5, 0), time(13, 30), 'BAR'),
-        'mid': (time(9, 30), time(18, 0), 'MID'),
-        'pm': (time(12, 0), time(20, 30), 'PM'),
-        'closing': (time(13, 0), time(21, 30), ''),
-    }
+    SHIFT_PRESETS = _build_shift_presets()
 
     applied = 0
     for emp in employees:
@@ -534,6 +515,7 @@ def apply_shift_presets():
             shift_date = week_start + timedelta(days=day_index)
             shift_type = preset_info.get('shift_type', '')
             station = preset_info.get('station', '')
+            custom_text = preset_info.get('custom_text', '')
 
             if not shift_type:
                 continue
@@ -547,6 +529,8 @@ def apply_shift_presets():
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_off=True)
             elif shift_type == 'ro':
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, is_request_off=True)
+            elif shift_type == 'custom' and custom_text:
+                new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date, custom_text=custom_text)
             elif shift_type in SHIFT_PRESETS:
                 start_t, end_t, default_station = SHIFT_PRESETS[shift_type]
                 new_shift = Shift(id=shift_id, employee_id=emp.id, employee_name=emp.name, date=shift_date,
@@ -1359,6 +1343,101 @@ def _match_invoice_to_order(invoice):
             })
 
     invoice.order_discrepancies = discrepancies
+
+# ============ Shift Management Routes ============
+
+@app.route('/shifts')
+@login_required
+def shifts_page():
+    """Manage shift definitions (the shift types available in schedule dropdowns)"""
+    definitions = data_store.load_shift_definitions()
+    return render_template('shifts.html', definitions=definitions)
+
+
+@app.route('/shifts/add', methods=['POST'])
+@login_required
+def add_shift_definition():
+    """Add a new shift definition"""
+    import re
+    key = request.form.get('key', '').strip().lower()
+    name = request.form.get('name', '').strip()
+    start = request.form.get('start', '').strip()
+    end = request.form.get('end', '').strip()
+    station = request.form.get('station', '').strip().upper()
+
+    if not key or not name or not start or not end:
+        flash('All fields except station are required', 'error')
+        return redirect(url_for('shifts_page'))
+
+    if not re.match(r'^[a-z0-9_]+$', key):
+        flash('Key must be lowercase letters, numbers, or underscores only', 'error')
+        return redirect(url_for('shifts_page'))
+
+    definitions = data_store.load_shift_definitions()
+    if key in definitions:
+        flash(f'A shift with key "{key}" already exists', 'error')
+        return redirect(url_for('shifts_page'))
+
+    definitions[key] = {'name': name, 'start': start, 'end': end, 'station': station}
+    data_store.save_shift_definitions(definitions)
+    flash(f'Added shift: {name}', 'success')
+    return redirect(url_for('shifts_page'))
+
+
+@app.route('/shifts/edit', methods=['POST'])
+@login_required
+def edit_shift_definition():
+    """Edit an existing shift definition"""
+    original_key = request.form.get('original_key', '').strip()
+    name = request.form.get('name', '').strip()
+    start = request.form.get('start', '').strip()
+    end = request.form.get('end', '').strip()
+    station = request.form.get('station', '').strip().upper()
+
+    if not original_key or not name or not start or not end:
+        flash('All fields except station are required', 'error')
+        return redirect(url_for('shifts_page'))
+
+    definitions = data_store.load_shift_definitions()
+    if original_key not in definitions:
+        flash(f'Shift "{original_key}" not found', 'error')
+        return redirect(url_for('shifts_page'))
+
+    definitions[original_key] = {'name': name, 'start': start, 'end': end, 'station': station}
+    data_store.save_shift_definitions(definitions)
+    flash(f'Updated shift: {name}', 'success')
+    return redirect(url_for('shifts_page'))
+
+
+@app.route('/shifts/<key>/delete', methods=['POST'])
+@login_required
+def delete_shift_definition(key):
+    """Delete a shift definition"""
+    definitions = data_store.load_shift_definitions()
+    removed = definitions.pop(key, None)
+    if removed:
+        data_store.save_shift_definitions(definitions)
+        flash(f'Deleted shift: {removed["name"]}', 'success')
+    else:
+        flash('Shift not found', 'error')
+    return redirect(url_for('shifts_page'))
+
+
+@app.route('/shifts/reset', methods=['POST'])
+@login_required
+def reset_shift_definitions():
+    """Reset shift definitions to defaults"""
+    data_store.save_shift_definitions(dict(data_store.DEFAULT_SHIFT_DEFINITIONS))
+    flash('Shift definitions reset to defaults', 'success')
+    return redirect(url_for('shifts_page'))
+
+
+@app.route('/shifts/definitions.json')
+@login_required
+def get_shift_definitions_json():
+    """Return shift definitions as JSON for frontend consumption"""
+    return jsonify(data_store.load_shift_definitions())
+
 
 @app.route('/invoices')
 @login_required

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Shift Definitions - Keil's Service Deli{% endblock %}
+
+{% block content %}
+<div class="shifts-page">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <h2>Shift Definitions</h2>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Shift</button>
+    </div>
+    <p class="help-text" style="margin-bottom:18px;color:#6b7280;">These are the shift types available in the schedule dropdown and presets. Changes here update everywhere.</p>
+
+    <div class="card">
+        <div class="card-body" style="overflow-x:auto;">
+            <table class="table" id="defsTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Station</th>
+                        <th style="width:140px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, d in definitions.items() %}
+                    {% set sh = d.start.split(':') %}
+                    {% set eh = d.end.split(':') %}
+                    {% set s_h = sh[0]|int %}
+                    {% set e_h = eh[0]|int %}
+                    <tr id="row-{{ key }}">
+                        <td><strong>{{ d.name }}</strong></td>
+                        <td>{{ '%d:%s %s'|format(s_h if s_h <= 12 else s_h - 12, sh[1], 'AM' if s_h < 12 else 'PM') }}</td>
+                        <td>{{ '%d:%s %s'|format(e_h if e_h <= 12 else e_h - 12, eh[1], 'AM' if e_h < 12 else 'PM') }}</td>
+                        <td>{{ d.station or '-' }}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn btn-sm btn-primary" onclick="openEditModal('{{ key }}', '{{ d.name }}', '{{ d.start }}', '{{ d.end }}', '{{ d.station }}')">Edit</button>
+                            <form method="POST" action="{{ url_for('delete_shift_definition', key=key) }}" style="display:inline;" onsubmit="return confirm('Delete the {{ d.name }} shift? This will remove it from schedule dropdowns.');">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not definitions %}
+                    <tr><td colspan="5" class="empty-state">No shift definitions yet. Add one above.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <form method="POST" action="{{ url_for('reset_shift_definitions') }}" onsubmit="return confirm('Reset all shift definitions to defaults? This cannot be undone.');">
+            <button type="submit" class="btn btn-outline" style="color:#dc2626;border-color:#dc2626;">Reset to Defaults</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div id="shiftDefModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <h3 id="modal-title">Add Shift Definition</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <form method="POST" id="defForm" action="{{ url_for('add_shift_definition') }}">
+            <input type="hidden" name="original_key" id="original-key" value="">
+            <div class="form-group">
+                <label>Key <span style="font-weight:normal;color:#6b7280;">(lowercase, no spaces)</span></label>
+                <input type="text" name="key" id="def-key" required pattern="[a-z0-9_]+" maxlength="20" placeholder="e.g. morning">
+            </div>
+            <div class="form-group">
+                <label>Display Name</label>
+                <input type="text" name="name" id="def-name" required maxlength="30" placeholder="e.g. Morning">
+            </div>
+            <div class="form-group">
+                <label>Start Time</label>
+                <input type="time" name="start" id="def-start" required>
+            </div>
+            <div class="form-group">
+                <label>End Time</label>
+                <input type="time" name="end" id="def-end" required>
+            </div>
+            <div class="form-group">
+                <label>Default Station <span style="font-weight:normal;color:#6b7280;">(optional)</span></label>
+                <input type="text" name="station" id="def-station" maxlength="10" placeholder="e.g. BAR">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="modal-submit">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.shifts-page .help-text { font-size:0.9rem; }
+.shifts-page code { background:#f3f4f6; padding:2px 6px; border-radius:4px; font-size:0.85rem; }
+.shifts-page .table th { font-size:0.8rem; text-transform:uppercase; color:#6b7280; }
+.shifts-page .table td { vertical-align:middle; }
+
+.btn-danger { background:#dc2626; color:white; }
+.btn-danger:hover { background:#b91c1c; }
+
+#shiftDefModal {
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#shiftDefModal .modal-content {
+    background: white;
+    border-radius: 10px;
+    padding: 24px;
+    width: 90%;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+#shiftDefModal .modal-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+#shiftDefModal .modal-header h3 { margin:0; }
+#shiftDefModal .modal-close {
+    background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280;
+}
+#shiftDefModal .form-group { margin-bottom: 12px; }
+#shiftDefModal .form-group label { display:block; font-weight:600; margin-bottom:4px; font-size:0.85rem; }
+#shiftDefModal .form-group input {
+    width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.9rem;
+}
+</style>
+
+<script>
+function openAddModal() {
+    document.getElementById('modal-title').textContent = 'Add Shift Definition';
+    document.getElementById('modal-submit').textContent = 'Add';
+    document.getElementById('defForm').action = '{{ url_for("add_shift_definition") }}';
+    document.getElementById('original-key').value = '';
+    document.getElementById('def-key').value = '';
+    document.getElementById('def-key').readOnly = false;
+    document.getElementById('def-name').value = '';
+    document.getElementById('def-start').value = '';
+    document.getElementById('def-end').value = '';
+    document.getElementById('def-station').value = '';
+    document.getElementById('shiftDefModal').style.display = 'flex';
+}
+
+function openEditModal(key, name, start, end, station) {
+    document.getElementById('modal-title').textContent = 'Edit Shift: ' + name;
+    document.getElementById('modal-submit').textContent = 'Save';
+    document.getElementById('defForm').action = '{{ url_for("edit_shift_definition") }}';
+    document.getElementById('original-key').value = key;
+    document.getElementById('def-key').value = key;
+    document.getElementById('def-key').readOnly = true;
+    document.getElementById('def-name').value = name;
+    document.getElementById('def-start').value = start;
+    document.getElementById('def-end').value = end;
+    document.getElementById('def-station').value = station;
+    document.getElementById('shiftDefModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('shiftDefModal').style.display = 'none';
+}
+
+document.getElementById('shiftDefModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+});
+</script>
+{% endblock %}
