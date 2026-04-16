@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}AA Plastics Order Summary{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🛒 AA Plastics — Order Checklist</h2>
+    <p style="color:#888; margin-top:4px;">Use this checklist to place your order on the AA Plastics website.</p>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+            <strong>Order #{{ order.id }}</strong>
+            {% if order.po_number %}<span style="margin-left:12px; color:#888;">PO: {{ order.po_number }}</span>{% endif %}
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="https://www.aaplastic.com/login" target="_blank" rel="noopener" class="btn btn-primary">🔗 Open AA Plastics Website</a>
+            <a href="{{ url_for('ordering', vendor='V005') }}" class="btn btn-outline">← Back to Orders</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if order.notes %}
+        <p><strong>Notes:</strong> {{ order.notes }}</p>
+        {% endif %}
+
+        <div style="overflow-x:auto;">
+            <table class="table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th style="width:30px;">✓</th>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th style="text-align:center;">Qty</th>
+                        <th style="text-align:right;">Unit Cost</th>
+                        <th style="text-align:right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                    <tr>
+                        <td><input type="checkbox" style="width:20px; height:20px;"></td>
+                        <td>{{ item.product_name }}</td>
+                        <td style="color:#888;">{{ item.sku or '—' }}</td>
+                        <td style="text-align:center; font-weight:bold;">{{ item.quantity }}</td>
+                        <td style="text-align:right;">${{ "%.2f"|format(item.cost) }}</td>
+                        <td style="text-align:right; font-weight:bold;">${{ "%.2f"|format(item.total_cost) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="border-top: 2px solid #444;">
+                        <td colspan="3"><strong>Total</strong></td>
+                        <td style="text-align:center; font-weight:bold;">{{ order.total_items }} items</td>
+                        <td></td>
+                        <td style="text-align:right; font-weight:bold; font-size:1.1em;">${{ "%.2f"|format(order.total_cost) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div style="margin-top:20px; padding:16px; background:#1a2a1a; border-radius:8px; border:1px solid #2a4a2a;">
+            <strong>📋 How to place this order on your phone:</strong>
+            <ol style="margin:8px 0 0 0; padding-left:20px; line-height:1.8;">
+                <li>Tap <strong>"Open AA Plastics Website"</strong> above</li>
+                <li>Log in with the deli account</li>
+                <li>Select <strong>Deli</strong> department</li>
+                <li>Start a new order and search for each product</li>
+                <li>Use the checkboxes above to track your progress</li>
+                <li>Review and submit on their site</li>
+            </ol>
+            <p style="margin-top:10px; color:#888; font-size:0.9em;">💡 <em>Tip: On a computer, the "Submit Order via Website" button auto-fills everything for you.</em></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

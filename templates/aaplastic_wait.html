@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}AA Plastics — Filling Order...{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 80px auto; text-align: center;">
+    <div id="spinner" style="font-size: 3em; margin-bottom: 20px;">🤖</div>
+    <h2 id="statusTitle">Filling your order on AA Plastics…</h2>
+    <p id="statusMsg" style="color: #999; margin-top: 10px;">
+        Logging in, selecting Deli, and entering your items.<br>
+        This usually takes 30–60 seconds.
+    </p>
+
+    <div style="margin-top: 30px;">
+        <div style="width: 100%; height: 6px; background: #333; border-radius: 3px; overflow: hidden;">
+            <div id="progressBar" style="width: 10%; height: 100%; background: #4a9eff; border-radius: 3px; transition: width 1s ease;"></div>
+        </div>
+    </div>
+
+    <p id="errorBox" style="display:none; margin-top: 30px; padding: 16px; background: #3a1a1a; border: 1px solid #6a2a2a; border-radius: 8px; color: #ff8888;"></p>
+
+    <a href="{{ url_for('ordering', vendor='V005') }}" class="btn btn-outline" style="margin-top: 30px;">← Cancel &amp; Go Back</a>
+</div>
+
+<script>
+(function() {
+    var jobId = {{ job_id | tojson }};
+    var bar = document.getElementById('progressBar');
+    var pct = 10;
+    var pollInterval;
+
+    function tick() {
+        if (pct < 90) { pct += 5; bar.style.width = pct + '%'; }
+    }
+
+    function poll() {
+        fetch('/ordering/aaplastic-job-status/' + jobId, {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'ready' || data.status === 'error') {
+                    clearInterval(pollInterval);
+                    bar.style.width = '100%';
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                }
+            })
+            .catch(function() { /* keep polling */ });
+    }
+
+    pollInterval = setInterval(function() { tick(); poll(); }, 3000);
+    // First poll after 5 seconds (give Selenium time to start)
+    setTimeout(poll, 5000);
+})();
+</script>
+{% endblock %}

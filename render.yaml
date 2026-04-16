@@ -1,9 +1,7 @@
 services:
   - type: web
     name: keils-service-deli
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    runtime: docker
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.6"
+      - key: RENDER
+        value: "true"

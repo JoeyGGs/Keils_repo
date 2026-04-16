@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}AA Plastics — Review Order{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🤖 AA Plastics — Review Before Submitting</h2>
+</div>
+
+{% if error %}
+<div class="card" style="margin-bottom: 20px; border-color: #6a2a2a;">
+    <div class="card-body" style="background: #3a1a1a;">
+        <strong style="color: #ff8888;">⚠️ Something went wrong:</strong>
+        <p style="color: #ff8888; margin-top: 6px;">{{ error }}</p>
+        <p style="color: #aaa; margin-top: 8px;">You can still try to submit manually using the link below.</p>
+    </div>
+</div>
+{% endif %}
+
+{% if screenshot_url %}
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header"><strong>📸 Screenshot of Filled Order</strong></div>
+    <div class="card-body" style="padding: 0; text-align: center;">
+        <img src="{{ screenshot_url }}" alt="AA Plastics order screenshot"
+             style="width: 100%; max-width: 100%; border-radius: 0 0 8px 8px; cursor: zoom-in;"
+             onclick="this.style.maxWidth = this.style.maxWidth === 'none' ? '100%' : 'none'">
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <strong>📋 Items Filled: {{ filled }} of {{ filled + missed }}</strong>
+        {% if missed > 0 %}
+        <span style="background: #6a2a2a; color: #ff8888; padding: 4px 10px; border-radius: 12px; font-size: 0.85em;">
+            {{ missed }} item{{ 's' if missed != 1 }} not found
+        </span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if order %}
+        <div style="overflow-x: auto;">
+            <table class="table" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                    <tr>
+                        <td>{{ item.product_name }}</td>
+                        <td style="color: #888;">{{ item.sku or '—' }}</td>
+                        <td style="text-align: center; font-weight: bold;">{{ item.quantity }}</td>
+                        <td style="text-align: right;">
+                            {% if item.product_name in missed_items %}
+                            <span style="color: #ff8888;">❌ Not found</span>
+                            {% else %}
+                            <span style="color: #66cc66;">✅ Filled</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if missed_items %}
+        <div style="margin-top: 14px; padding: 12px; background: #2a1a1a; border-radius: 6px; border: 1px solid #4a2a2a;">
+            <strong style="color: #ff8888;">Items not found on AA Plastics (enter manually):</strong>
+            <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                {% for name in missed_items %}
+                <li>{{ name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 40px;">
+    {% if not error %}
+    <form method="POST" action="{{ url_for('aaplastic_approve', job_id=job_id) }}"
+          onsubmit="return confirm('Submit this order on AA Plastics?\n\nThis will place the order and charge the store account.')">
+        <button type="submit" class="btn btn-primary" style="font-size: 1.1em; padding: 12px 28px;">
+            ✅ Submit Order on AA Plastics
+        </button>
+    </form>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('aaplastic_cancel', job_id=job_id) }}">
+        <button type="submit" class="btn btn-danger" style="font-size: 1.1em; padding: 12px 28px;">
+            ❌ Cancel
+        </button>
+    </form>
+
+    <a href="https://www.aaplastic.com/login" target="_blank" rel="noopener"
+       class="btn btn-outline" style="font-size: 1.1em; padding: 12px 28px;">
+        🔗 Open AA Plastics Manually
+    </a>
+</div>
+{% endblock %}

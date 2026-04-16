@@ -47,21 +47,44 @@ def get_credentials():
 def create_driver(headless=False):
     """Create and return a configured Chrome WebDriver."""
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
     from selenium import webdriver
 
     chrome_options = Options()
-    chrome_options.add_experimental_option("detach", True)  # Keep browser open
-    chrome_options.add_argument("--start-maximized")
-    if headless:
+
+    # On Render / Docker, always force headless
+    is_server = bool(os.environ.get('RENDER') or os.environ.get('DOCKER'))
+
+    if headless or is_server:
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+    else:
+        chrome_options.add_experimental_option("detach", True)  # Keep browser open
+        chrome_options.add_argument("--start-maximized")
+
+    # Container / server flags
+    if is_server:
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-background-networking")
+        chrome_bin = os.environ.get('CHROME_BIN')
+        if chrome_bin:
+            chrome_options.binary_location = chrome_bin
 
     try:
-        driver = webdriver.Chrome(options=chrome_options)
+        chromedriver_path = os.environ.get('CHROMEDRIVER_PATH')
+        if chromedriver_path and os.path.exists(chromedriver_path):
+            service = Service(executable_path=chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            driver = webdriver.Chrome(options=chrome_options)
     except Exception as e:
         print(f"ERROR: Could not launch Chrome. Make sure Chrome is installed.")
         print(f"       Error: {e}")
+        if headless or is_server:
+            raise  # Don't sys.exit when called from web app
         sys.exit(1)
 
     return driver

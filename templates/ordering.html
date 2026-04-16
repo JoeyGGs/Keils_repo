@@ -694,7 +694,8 @@
                         <div class="order-actions" style="margin-top: 16px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                             {% if selected_vendor.id == 'V005' %}
                             {# AA Plastics: Submit goes through the website — login, Deli, Start Order, fill items #}
-                            <form method="POST" action="{{ url_for('aaplastic_submit_order', order_id=vendor_data.draft_order.id) }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;" onsubmit="return confirm('This will open AA Plastics, log in, select Deli, start an order, and fill your quantities for review.\n\nYou review and submit on their website.\n\nContinue?')">
+                            <form id="aaPlasticForm" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;">
+                                <input type="hidden" name="order_id" value="{{ vendor_data.draft_order.id }}">
                                 <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
                                     <label>PO Number (optional)</label>
                                     <input type="text" name="po_number" class="form-control" placeholder="PO-001">
@@ -703,7 +704,7 @@
                                     <label>Notes (optional)</label>
                                     <input type="text" name="notes" class="form-control" placeholder="Delivery instructions, etc.">
                                 </div>
-                                <button type="submit" class="btn btn-primary">🤖 Submit Order via Website</button>
+                                <button type="submit" class="btn btn-primary" id="aaPlasticSubmitBtn">🤖 Submit Order via Website</button>
                             </form>
                             {% else %}
                             <form method="POST" action="{{ url_for('vendor_catalog_submit_order', vendor_id=selected_vendor.id, order_id=vendor_data.draft_order.id) }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; flex: 1;">
@@ -1197,24 +1198,48 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 {% endif %}
 
-/* ------ AA Plastics submit handler (mobile-aware) ------ */
-function handleAAPlasticSubmit(form) {
-    var isMobile = /mobile|android|iphone|ipad|ipod|windows phone/i.test(navigator.userAgent);
+/* ------ AA Plastics submit via fetch (works in PWA / iOS standalone) ------ */
+(function() {
+    var form = document.getElementById('aaPlasticForm');
+    if (!form) return;
 
-    if (isMobile) {
-        /* On mobile the server runs headless Selenium and returns a review page.
-           Show a loading overlay while the user waits (~15-30 seconds). */
-        if (!confirm('This will submit your order to AA Plastics via the server.\n\nThis can take 15-30 seconds — please wait.\n\nContinue?')) {
-            return false;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (!confirm('This will fill your order on AA Plastics automatically.\n\nYou\'ll review everything before it gets submitted.\n\nContinue?')) {
+            return;
         }
-        /* Show loading overlay */
-        var overlay = document.getElementById('aaLoadingOverlay');
-        if (overlay) overlay.style.display = 'flex';
-        return true; /* Allow the normal form POST — server returns the review page */
-    } else {
-        /* Desktop: opens a visible Chrome window on this machine */
-        return confirm('This will open AA Plastics, log in, select Deli, start an order, and fill your quantities for review.\n\nYou review and submit on their website.\n\nContinue?');
-    }
-}
+
+        var btn = document.getElementById('aaPlasticSubmitBtn');
+        var origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ Submitting...';
+
+        var orderId = form.querySelector('input[name="order_id"]').value;
+        var formData = new FormData(form);
+
+        fetch('/ordering/aaplastic-submit-order/' + orderId, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (data.message) {
+                alert(data.message);
+            }
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else {
+                window.location.href = '{{ url_for("ordering", vendor="V005") }}';
+            }
+        })
+        .catch(function(err) {
+            alert('Error submitting order: ' + err);
+            btn.disabled = false;
+            btn.textContent = origText;
+        });
+    });
+})();
 </script>
 {% endblock %}

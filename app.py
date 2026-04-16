@@ -3,10 +3,12 @@ Keil's Service Deli - Web Application
 Flask-based web interface
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from functools import wraps
 from datetime import datetime, date, time, timedelta
 import os
+import threading
+import uuid as _uuid
 
 from flask import Response
 from src.auth import AuthManager
@@ -30,6 +32,49 @@ kehe_manager = KeHEManager()
 vendor_order_manager = VendorOrderManager()
 invoice_manager = InvoiceManager()
 invoice_parser = InvoiceOCRParser()
+
+# ---------------------------------------------------------------------------
+# AA Plastics headless job store  (in-memory, single-worker gunicorn is fine)
+# ---------------------------------------------------------------------------
+_aaplastic_jobs = {}   # {job_id: {status, order_id, driver, screenshot, ...}}
+
+_SCREENSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                'static', 'screenshots')
+
+
+def _run_aaplastic_job(job_id, order_id):
+    """Background thread: headless Selenium fills order on AA Plastics."""
+    try:
+        from aaplastic_submit_order import submit_order_headless
+        result = submit_order_headless(order_id, screenshot_dir=_SCREENSHOTS_DIR)
+        _aaplastic_jobs[job_id].update({
+            'status': 'error' if result.get('error') else 'ready',
+            'driver': result.get('driver'),
+            'screenshot': result.get('screenshot'),
+            'filled': result.get('filled', 0),
+            'missed': result.get('missed', 0),
+            'missed_items': result.get('missed_items', []),
+            'error': result.get('error'),
+        })
+    except Exception as e:
+        _aaplastic_jobs[job_id].update({'status': 'error', 'error': str(e)})
+
+
+def _cleanup_aaplastic_job(job_id):
+    """Quit browser & delete screenshot for a finished job."""
+    job = _aaplastic_jobs.pop(job_id, None)
+    if not job:
+        return
+    if job.get('driver'):
+        try:
+            job['driver'].quit()
+        except Exception:
+            pass
+    if job.get('screenshot'):
+        try:
+            os.remove(job['screenshot'])
+        except Exception:
+            pass
 
 
 def _build_shift_presets():
@@ -1835,16 +1880,162 @@ def aaplastic_scrape_catalog():
 @app.route('/ordering/aaplastic-submit-order/<order_id>', methods=['POST'])
 @login_required
 def aaplastic_submit_order(order_id):
-    """Launch AA Plastics order submission — opens browser, logs in, starts order, fills quantities."""
+    """Launch AA Plastics order submission.
+
+    Local server: opens a visible Chrome window via Selenium.
+    Render / remote: headless Selenium fills order, user reviews screenshot.
+    """
+    is_render = bool(os.environ.get('RENDER'))
+
+    if is_render:
+        # --- Remote / Render: headless Selenium in background thread ---
+        job_id = str(_uuid.uuid4())
+        _aaplastic_jobs[job_id] = {
+            'status': 'running',
+            'order_id': order_id,
+            'driver': None,
+            'screenshot': None,
+            'filled': 0,
+            'missed': 0,
+            'missed_items': [],
+            'error': None,
+        }
+        t = threading.Thread(target=_run_aaplastic_job,
+                             args=(job_id, order_id), daemon=True)
+        t.start()
+        return jsonify({
+            'mode': 'remote',
+            'redirect': url_for('aaplastic_wait', job_id=job_id),
+        })
+    else:
+        # --- Local server: launch visible Chrome ---
+        try:
+            import subprocess
+            import sys
+            script_path = os.path.join(os.path.dirname(__file__), 'aaplastic_submit_order.py')
+            subprocess.Popen([sys.executable, script_path, order_id], cwd=os.path.dirname(__file__))
+            return jsonify({
+                'mode': 'local',
+                'redirect': url_for('ordering', vendor='V005'),
+                'message': 'AA Plastics order opened — check the Chrome window. Review and submit on their site.',
+            })
+        except Exception as e:
+            return jsonify({
+                'mode': 'error',
+                'redirect': url_for('ordering', vendor='V005'),
+                'message': f'Could not launch AA Plastics: {e}',
+            }), 500
+
+
+@app.route('/ordering/aaplastic-wait/<job_id>')
+@login_required
+def aaplastic_wait(job_id):
+    """Waiting page while headless Selenium fills the order."""
+    job = _aaplastic_jobs.get(job_id)
+    if not job:
+        flash('Job not found or expired.', 'error')
+        return redirect(url_for('ordering', vendor='V005'))
+    return render_template('aaplastic_wait.html', job_id=job_id)
+
+
+@app.route('/ordering/aaplastic-job-status/<job_id>')
+@login_required
+def aaplastic_job_status(job_id):
+    """Polling endpoint for headless job progress."""
+    job = _aaplastic_jobs.get(job_id)
+    if not job:
+        return jsonify({'status': 'error', 'error': 'Job not found'}), 404
+    data = {'status': job['status'], 'error': job.get('error')}
+    if job['status'] == 'ready':
+        data['redirect'] = url_for('aaplastic_review', job_id=job_id)
+    elif job['status'] == 'error':
+        data['redirect'] = url_for('aaplastic_review', job_id=job_id)
+    return jsonify(data)
+
+
+@app.route('/ordering/aaplastic-review/<job_id>')
+@login_required
+def aaplastic_review(job_id):
+    """Review page: screenshot of filled order + approve / cancel."""
+    job = _aaplastic_jobs.get(job_id)
+    if not job:
+        flash('Job not found or expired.', 'error')
+        return redirect(url_for('ordering', vendor='V005'))
+
+    screenshot_url = None
+    if job.get('screenshot'):
+        filename = os.path.basename(job['screenshot'])
+        screenshot_url = url_for('static', filename=f'screenshots/{filename}')
+
+    # Load order details for the item table
+    order = None
     try:
-        import subprocess
-        import sys
-        script_path = os.path.join(os.path.dirname(__file__), 'aaplastic_submit_order.py')
-        subprocess.Popen([sys.executable, script_path, order_id], cwd=os.path.dirname(__file__))
-        flash('AA Plastics order opened — check the Chrome window. Quantities are filled in for you to REVIEW. You must submit manually on their site.', 'success')
+        all_orders = vendor_order_manager._load_all_orders()
+        order = next((o for o in all_orders
+                       if o.id == job.get('order_id')), None)
+    except Exception:
+        pass
+
+    return render_template('aaplastic_review.html',
+                           job_id=job_id,
+                           order=order,
+                           filled=job.get('filled', 0),
+                           missed=job.get('missed', 0),
+                           missed_items=job.get('missed_items', []),
+                           screenshot_url=screenshot_url,
+                           error=job.get('error'))
+
+
+@app.route('/ordering/aaplastic-approve/<job_id>', methods=['POST'])
+@login_required
+def aaplastic_approve(job_id):
+    """User approved — click submit on AA Plastics via saved driver."""
+    job = _aaplastic_jobs.get(job_id)
+    if not job or not job.get('driver'):
+        flash('Session expired — please try again.', 'error')
+        _cleanup_aaplastic_job(job_id)
+        return redirect(url_for('ordering', vendor='V005'))
+
+    try:
+        from aaplastic_submit_order import click_submit_order
+        success = click_submit_order(job['driver'])
+        if success:
+            flash('Order submitted on AA Plastics!', 'success')
+        else:
+            flash('Could not find the submit button. Log in to AA Plastics and submit manually.', 'warning')
     except Exception as e:
-        flash(f'Could not launch AA Plastics order submission: {e}', 'error')
+        flash(f'Error submitting order: {e}', 'error')
+    finally:
+        _cleanup_aaplastic_job(job_id)
+
     return redirect(url_for('ordering', vendor='V005'))
+
+
+@app.route('/ordering/aaplastic-cancel/<job_id>', methods=['POST'])
+@login_required
+def aaplastic_cancel(job_id):
+    """User cancelled — quit browser, clean up."""
+    _cleanup_aaplastic_job(job_id)
+    flash('AA Plastics order cancelled.', 'info')
+    return redirect(url_for('ordering', vendor='V005'))
+
+
+@app.route('/ordering/aaplastic-order-summary/<order_id>')
+@login_required
+def aaplastic_order_summary(order_id):
+    """Fallback: manual order checklist when headless Chrome is unavailable."""
+    order = None
+    try:
+        all_orders = vendor_order_manager._load_all_orders()
+        order = next((o for o in all_orders if o.id == order_id), None)
+    except Exception:
+        pass
+
+    if not order:
+        flash('Order not found', 'error')
+        return redirect(url_for('ordering', vendor='V005'))
+
+    return render_template('aaplastic_order_summary.html', order=order)
 
 
 # ============ Vendor Catalog Routes ============

@@ -225,6 +225,140 @@ def submit_order():
         print("The browser is still open — you can complete the order manually.")
 
 
+# ---------------------------------------------------------------------------
+# Headless mode: called from the web app on Render
+# ---------------------------------------------------------------------------
+
+def submit_order_headless(order_id, screenshot_dir=None):
+    """Run order fill headlessly. Returns dict with driver kept alive for approve.
+
+    Returns:
+        {
+            'driver': WebDriver | None,
+            'screenshot': str | None,   # file path
+            'filled': int,
+            'missed': int,
+            'missed_items': list[str],
+            'order': dict | None,
+            'error': str | None,
+        }
+    """
+    result = {
+        'driver': None, 'screenshot': None, 'filled': 0,
+        'missed': 0, 'missed_items': [], 'order': None, 'error': None,
+    }
+
+    order = load_draft_order(order_id)
+    if not order:
+        result['error'] = 'Order not found'
+        return result
+
+    result['order'] = order
+    items = order.get('items', [])
+    if not items:
+        result['error'] = 'Order has no items'
+        return result
+
+    catalog = load_product_catalog()
+
+    order_items = []
+    for item in items:
+        product = catalog.get(item['product_id'], {})
+        item_code = (product.get('item_code', '')
+                     or product.get('sku', '')
+                     or item.get('sku', ''))
+        order_items.append({
+            'name': item['product_name'],
+            'item_code': item_code or item['product_name'],
+            'quantity': item['quantity'],
+        })
+
+    driver = create_driver(headless=True)
+    result['driver'] = driver
+
+    try:
+        success = do_login(driver)
+        if not success:
+            _save_screenshot(driver, screenshot_dir, order_id, '_error', result)
+            result['error'] = 'Login to AA Plastics failed — check credentials'
+            return result
+
+        select_deli_department(driver)
+        navigate_to_start_order(driver)
+
+        filled = 0
+        missed = 0
+        missed_items = []
+        for oi in order_items:
+            if set_item_quantity(driver, oi['item_code'], oi['quantity']):
+                filled += 1
+            else:
+                missed += 1
+                missed_items.append(oi['name'])
+            time.sleep(0.3)
+
+        result['filled'] = filled
+        result['missed'] = missed
+        result['missed_items'] = missed_items
+
+        # Take a review screenshot
+        _save_screenshot(driver, screenshot_dir, order_id, '_review', result)
+        return result
+
+    except Exception as e:
+        _save_screenshot(driver, screenshot_dir, order_id, '_error', result)
+        result['error'] = str(e)
+        return result
+
+
+def _save_screenshot(driver, screenshot_dir, order_id, suffix, result):
+    """Helper: save a screenshot into result['screenshot']."""
+    if not screenshot_dir:
+        return
+    try:
+        os.makedirs(screenshot_dir, exist_ok=True)
+        path = os.path.join(screenshot_dir, f'{order_id}{suffix}.png')
+        driver.save_screenshot(path)
+        result['screenshot'] = path
+    except Exception:
+        pass
+
+
+def click_submit_order(driver):
+    """Click the submit / place-order button on the AA Plastics order page.
+
+    Returns True if a button was clicked.
+    """
+    from selenium.webdriver.common.by import By
+
+    try:
+        # Try common submit patterns
+        candidates = driver.find_elements(
+            By.CSS_SELECTOR,
+            "button[type='submit'], input[type='submit'], "
+            "button.submit-order, a.submit-order, "
+            "button[name='submit'], input[name='submit']"
+        )
+        for btn in candidates:
+            text = (btn.text + ' ' + (btn.get_attribute('value') or '')).lower()
+            if any(w in text for w in ('submit', 'place order', 'send order')):
+                btn.click()
+                time.sleep(3)
+                return True
+
+        # Fallback — any button whose text mentions "submit" or "order"
+        for btn in driver.find_elements(By.TAG_NAME, 'button'):
+            if any(w in btn.text.lower() for w in ('submit', 'place order', 'send order')):
+                btn.click()
+                time.sleep(3)
+                return True
+
+        return False
+    except Exception as e:
+        print(f"Error clicking submit: {e}")
+        return False
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("  All American Plastics - Submit Order")
