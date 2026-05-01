@@ -9,6 +9,7 @@ from datetime import datetime, date, time, timedelta
 import os
 import threading
 import uuid as _uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Response
 from src.auth import AuthManager
@@ -40,6 +41,20 @@ _aaplastic_jobs = {}   # {job_id: {status, order_id, driver, screenshot, ...}}
 
 _SCREENSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 'static', 'screenshots')
+_APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'America/Los_Angeles')
+
+
+def _get_local_now():
+    """Return the current app-local datetime for user-facing schedule data."""
+    try:
+        return datetime.now(ZoneInfo(_APP_TIMEZONE))
+    except ZoneInfoNotFoundError:
+        return datetime.now().astimezone()
+
+
+def _get_local_today():
+    """Return the current app-local date."""
+    return _get_local_now().date()
 
 
 def _run_aaplastic_job(job_id, order_id):
@@ -171,7 +186,8 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    today = date.today()
+    now = _get_local_now()
+    today = now.date()
     shifts = data_store.load_shifts()
     employees = data_store.load_employees()
     inventory = data_store.load_inventory()
@@ -181,7 +197,6 @@ def dashboard():
     today_shifts.sort(key=lambda x: x.start_time if x.start_time else time(0, 0))
     
     # Current time for on-duty calculation
-    now = datetime.now()
     current_time = now.time()
     
     on_duty = []
@@ -214,7 +229,7 @@ def dashboard():
 @app.route('/schedule')
 @login_required
 def schedule():
-    today = date.today()
+    today = _get_local_today()
     week_offset = int(request.args.get('week', 0))
     week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
@@ -280,13 +295,14 @@ def schedule():
                          schedule_data=schedule_data,
                          grand_total=grand_total,
                          today=today,
-                         shift_definitions=data_store.load_shift_definitions())
+                         shift_definitions=data_store.load_shift_definitions(),
+                         saved_shift_presets=data_store.load_shift_presets())
 
 
 @app.route('/schedule/print')
 @login_required
 def schedule_print():
-    today = date.today()
+    today = _get_local_today()
     week_offset = int(request.args.get('week', 0))
     week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
@@ -424,7 +440,7 @@ def update_shift():
 @login_required
 def create_new_schedule():
     """Create next week's schedule from saved presets"""
-    today = date.today()
+    today = _get_local_today()
     current_week_start = today - timedelta(days=today.weekday())
     # Target = next week from whichever week the user is currently viewing
     view_offset = int(request.form.get('week_offset', 0))
@@ -498,7 +514,7 @@ def delete_shift(shift_id):
 def delete_current_schedule():
     """Delete all shifts for the currently viewed week"""
     week_offset = int(request.form.get('week_offset', 0))
-    today = date.today()
+    today = _get_local_today()
     week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
 
@@ -536,7 +552,7 @@ def save_shift_presets():
 def apply_shift_presets():
     """Apply saved presets to the current week's schedule"""
     week_offset = int(request.form.get('week_offset', 0))
-    today = date.today()
+    today = _get_local_today()
     week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
 
     presets = data_store.load_shift_presets()
@@ -606,7 +622,7 @@ def schedule_ocr():
     try:
         # Get week start from form
         week_offset = int(request.form.get('week_offset', 0))
-        today = date.today()
+        today = _get_local_today()
         week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
         
         # Get employee names

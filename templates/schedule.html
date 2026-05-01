@@ -40,8 +40,9 @@
             <h2>Keil's Service Deli - Weekly Schedule</h2>
             <p>{{ week_start.strftime('%m/%d/%Y') }} - {{ week_end.strftime('%m/%d/%Y') }}</p>
         </div>
-        <div class="card-body schedule-table-container">
-            <table class="schedule-table">
+        <div class="card-body schedule-card-layout">
+            <div class="schedule-table-container">
+                <table class="schedule-table">
                     <tr>
                         <th class="name-col">Name</th>
                         {% for day in days %}
@@ -69,6 +70,17 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
+            <aside class="preset-sidebar no-print" aria-label="Saved shift presets">
+                <div class="preset-sidebar-header">
+                    <div>
+                        <h3>Saved Presets</h3>
+                        <p>Persistent backup of weekly defaults for add, delete, and override.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openPresetsModal()">Manage</button>
+                </div>
+                <div id="presetSidebarContent" class="preset-sidebar-content"></div>
+            </aside>
         </div>
     </div>
 
@@ -356,8 +368,148 @@
     background: #059669;
 }
 
+.schedule-card-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+}
+
 .schedule-table-container {
+    flex: 1 1 auto;
     overflow-x: auto;
+}
+
+.preset-sidebar {
+    flex: 0 0 320px;
+    background: #f8fafc;
+    border: 1px solid #dbe3ee;
+    border-radius: 12px;
+    padding: 14px;
+    position: sticky;
+    top: 16px;
+    max-height: 72vh;
+    overflow-y: auto;
+}
+
+.preset-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.preset-sidebar-header h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.preset-sidebar-header p {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.preset-sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.preset-sidebar-empty {
+    padding: 18px 14px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    background: white;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.preset-sidebar-group {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.preset-sidebar-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #eef2f7;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.preset-sidebar-group-header strong {
+    display: block;
+}
+
+.preset-count {
+    font-size: 0.76rem;
+    color: #64748b;
+}
+
+.preset-sidebar-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.preset-sidebar-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.preset-sidebar-item:first-child {
+    border-top: 0;
+}
+
+.preset-sidebar-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.preset-day {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
+    min-width: 38px;
+}
+
+.preset-sidebar-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.preset-action-btn {
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #334155;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.preset-action-btn:hover {
+    background: #f8fafc;
+}
+
+.preset-action-btn.delete {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.preset-action-btn.delete:hover {
+    background: #fef2f2;
 }
 
 .schedule-table {
@@ -773,12 +925,28 @@ input[type="file"]:hover {
         margin: 0.5in;
     }
 }
+
+@media (max-width: 1180px) {
+    .schedule-card-layout {
+        flex-direction: column;
+    }
+
+    .preset-sidebar {
+        position: static;
+        width: 100%;
+        max-height: none;
+    }
+}
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 // ========== Dropdown Menu ==========
+const PRESET_STORAGE_KEY = 'keils_shift_presets_v1';
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let shiftPresetsState = normalizePresets({{ saved_shift_presets | tojson }});
+
 function toggleScheduleMenu() {
     document.getElementById('scheduleDropdown').classList.toggle('open');
 }
@@ -906,6 +1074,190 @@ Object.keys(_shiftDefs).forEach(function(key) {
     PRESET_DESCRIPTIONS[key] = d.name + ' ' + fmtTime(d.start) + '-' + fmtTime(d.end);
     PRESET_CHIP_CLASSES[key] = 'preset-' + key;
 });
+
+function normalizePresets(presets) {
+    if (!presets || Array.isArray(presets) || typeof presets !== 'object') {
+        return {};
+    }
+
+    const normalized = {};
+    Object.keys(presets).forEach(function(empId) {
+        const employeePresets = presets[empId];
+        if (!employeePresets || typeof employeePresets !== 'object') {
+            return;
+        }
+
+        const cleaned = {};
+        Object.keys(employeePresets).forEach(function(day) {
+            const preset = employeePresets[day];
+            if (!preset || typeof preset !== 'object' || !preset.shift_type) {
+                return;
+            }
+            cleaned[String(day)] = {
+                shift_type: preset.shift_type,
+                station: preset.station || '',
+                custom_text: preset.custom_text || ''
+            };
+        });
+
+        if (Object.keys(cleaned).length) {
+            normalized[String(empId)] = cleaned;
+        }
+    });
+
+    return normalized;
+}
+
+function readLocalPresets() {
+    try {
+        const raw = localStorage.getItem(PRESET_STORAGE_KEY);
+        if (!raw) {
+            return {};
+        }
+        const parsed = JSON.parse(raw);
+        return normalizePresets(parsed.presets || parsed);
+    } catch (error) {
+        console.warn('Unable to read local presets backup', error);
+        return {};
+    }
+}
+
+function writeLocalPresets(presets) {
+    try {
+        localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify({
+            savedAt: new Date().toISOString(),
+            presets: presets
+        }));
+    } catch (error) {
+        console.warn('Unable to write local presets backup', error);
+    }
+}
+
+function hasPresetEntries(presets) {
+    return Object.keys(normalizePresets(presets)).length > 0;
+}
+
+function syncPresetsToServer(presets) {
+    return fetch('{{ url_for("save_shift_presets") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(presets)
+    }).then(function(response) {
+        return response.ok ? response.json() : Promise.reject(new Error('Preset sync failed'));
+    }).catch(function(error) {
+        console.warn('Unable to sync presets to server', error);
+        return { success: false };
+    });
+}
+
+function setShiftPresetsState(presets) {
+    shiftPresetsState = normalizePresets(presets);
+    writeLocalPresets(shiftPresetsState);
+    refreshPresetsSidebar();
+}
+
+function getEffectivePresets() {
+    const localPresets = readLocalPresets();
+    if (hasPresetEntries(shiftPresetsState)) {
+        writeLocalPresets(shiftPresetsState);
+        return shiftPresetsState;
+    }
+    if (hasPresetEntries(localPresets)) {
+        shiftPresetsState = localPresets;
+        syncPresetsToServer(localPresets);
+        return localPresets;
+    }
+    return {};
+}
+
+function getPresetDisplayText(preset) {
+    if (!preset || !preset.shift_type) {
+        return '-';
+    }
+    if (preset.shift_type === 'custom') {
+        return preset.custom_text || 'CUST';
+    }
+    return PRESET_LABELS[preset.shift_type] || preset.shift_type.toUpperCase();
+}
+
+function getPresetChipClass(preset) {
+    if (!preset || !preset.shift_type) {
+        return '';
+    }
+    return PRESET_CHIP_CLASSES[preset.shift_type] || '';
+}
+
+function refreshPresetsSidebar() {
+    const container = document.getElementById('presetSidebarContent');
+    if (!container) {
+        return;
+    }
+
+    const presets = normalizePresets(shiftPresetsState);
+    const employeeIds = Object.keys(presets).sort(function(a, b) {
+        const rowA = document.querySelector('#presetsTable tr[data-emp-id="' + a + '"]');
+        const rowB = document.querySelector('#presetsTable tr[data-emp-id="' + b + '"]');
+        const nameA = rowA ? rowA.getAttribute('data-emp-name') : a;
+        const nameB = rowB ? rowB.getAttribute('data-emp-name') : b;
+        return nameA.localeCompare(nameB);
+    });
+
+    if (!employeeIds.length) {
+        container.innerHTML = '<div class="preset-sidebar-empty">No presets saved yet. Use Manage to add repeating shifts, then they will stay available here even after Render spins the app down.</div>';
+        return;
+    }
+
+    container.innerHTML = employeeIds.map(function(empId) {
+        const row = document.querySelector('#presetsTable tr[data-emp-id="' + empId + '"]');
+        const empName = row ? row.getAttribute('data-emp-name') : empId;
+        const entries = Object.keys(presets[empId]).sort(function(a, b) {
+            return Number(a) - Number(b);
+        }).map(function(dayIndex) {
+            const preset = presets[empId][dayIndex];
+            const label = getPresetDisplayText(preset);
+            const chipClass = getPresetChipClass(preset);
+            const dayLabel = DAY_NAMES[Number(dayIndex)] || ('Day ' + dayIndex);
+            return '<li class="preset-sidebar-item">'
+                + '<div><div class="preset-sidebar-meta">'
+                + '<span class="preset-day">' + dayLabel + '</span>'
+                + '<span class="preset-chip ' + chipClass + '">' + label + '</span>'
+                + '</div></div>'
+                + '<div class="preset-sidebar-actions">'
+                + '<button type="button" class="preset-action-btn" onclick="openPresetCellEditor(\'' + empId + '\', ' + Number(dayIndex) + ')">Override</button>'
+                + '<button type="button" class="preset-action-btn delete" onclick="deletePresetEntry(\'' + empId + '\', ' + Number(dayIndex) + ')">Delete</button>'
+                + '</div>'
+                + '</li>';
+        }).join('');
+
+        return '<section class="preset-sidebar-group">'
+            + '<div class="preset-sidebar-group-header"><div><strong>' + empName + '</strong><span class="preset-count">' + Object.keys(presets[empId]).length + ' preset(s)</span></div></div>'
+            + '<ul class="preset-sidebar-list">' + entries + '</ul>'
+            + '</section>';
+    }).join('');
+}
+
+function hydratePresetsTableFromData(presets) {
+    const normalized = normalizePresets(presets);
+    const rows = document.querySelectorAll('#presetsTable tbody tr');
+    rows.forEach(function(row) {
+        const empId = row.getAttribute('data-emp-id');
+        const cells = row.querySelectorAll('.preset-cell');
+        cells.forEach(function(cell) {
+            const day = cell.getAttribute('data-day');
+            const preset = (normalized[empId] && normalized[empId][day]) || {};
+            const type = preset.shift_type || '';
+            const customText = preset.custom_text || '';
+            cell.setAttribute('data-type', type);
+            if (type === 'custom' && customText) {
+                cell.setAttribute('data-custom-text', customText);
+                cell.querySelector('.preset-label').textContent = customText;
+            } else {
+                cell.removeAttribute('data-custom-text');
+                cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
+            }
+        });
+    });
+}
 
 // --- Dropdown creation ---
 let activeDropdown = null;
@@ -1042,6 +1394,11 @@ function promptCustomPreset(cell) {
 function attachPresetCellEvents() {
     const cells = document.querySelectorAll('#presetsTable .preset-cell');
     cells.forEach(cell => {
+        if (cell.dataset.presetBound === '1') {
+            return;
+        }
+        cell.dataset.presetBound = '1';
+
         let holdTimer = null;
         let didLongPress = false;
         let clickTimer = null;
@@ -1111,11 +1468,8 @@ function openPresetsModal() {
 function closePresetsModal() {
     // Auto-save presets when closing the modal
     const presets = gatherPresetsData();
-    fetch('{{ url_for("save_shift_presets") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(presets)
-    });
+    setShiftPresetsState(presets);
+    syncPresetsToServer(presets);
     document.getElementById('presetsModal').classList.remove('active');
 }
 
@@ -1129,12 +1483,8 @@ function clearAllPresets() {
             cell.querySelector('.preset-label').textContent = '-';
         });
     });
-    // Save empty presets to server
-    fetch('{{ url_for("save_shift_presets") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-    }).then(r => r.json()).then(data => {
+    setShiftPresetsState({});
+    syncPresetsToServer({}).then(data => {
         if (data.success) {
             alert('All presets cleared!');
         }
@@ -1142,29 +1492,9 @@ function clearAllPresets() {
 }
 
 function loadPresets() {
-    fetch('{{ url_for("get_shift_presets") }}')
-        .then(r => r.json())
-        .then(presets => {
-            const rows = document.querySelectorAll('#presetsTable tbody tr');
-            rows.forEach(row => {
-                const empId = row.getAttribute('data-emp-id');
-                const cells = row.querySelectorAll('.preset-cell');
-                cells.forEach(cell => {
-                    const day = cell.getAttribute('data-day');
-                    const preset = (presets[empId] && presets[empId][day]) || {};
-                    const type = preset.shift_type || '';
-                    const customText = preset.custom_text || '';
-                    cell.setAttribute('data-type', type);
-                    if (type === 'custom' && customText) {
-                        cell.setAttribute('data-custom-text', customText);
-                        cell.querySelector('.preset-label').textContent = customText;
-                    } else {
-                        cell.removeAttribute('data-custom-text');
-                        cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
-                    }
-                });
-            });
-        });
+    const presets = getEffectivePresets();
+    hydratePresetsTableFromData(presets);
+    refreshPresetsSidebar();
 }
 
 function gatherPresetsData() {
@@ -1196,11 +1526,8 @@ function gatherPresetsData() {
 
 function savePresets() {
     const presets = gatherPresetsData();
-    fetch('{{ url_for("save_shift_presets") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(presets)
-    }).then(r => r.json()).then(data => {
+    setShiftPresetsState(presets);
+    syncPresetsToServer(presets).then(data => {
         if (data.success) {
             alert('Presets saved!');
         }
@@ -1210,15 +1537,54 @@ function savePresets() {
 function savePresetsBeforeApply(event) {
     event.preventDefault();
     const presets = gatherPresetsData();
-    fetch('{{ url_for("save_shift_presets") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(presets)
-    }).then(r => r.json()).then(data => {
+    setShiftPresetsState(presets);
+    syncPresetsToServer(presets).then(data => {
         if (data.success) {
             event.target.closest('form').submit();
         }
     });
 }
+
+function deletePresetEntry(empId, dayIndex) {
+    if (!confirm('Delete this saved preset?')) {
+        return;
+    }
+
+    const nextPresets = normalizePresets(shiftPresetsState);
+    if (!nextPresets[empId]) {
+        return;
+    }
+
+    delete nextPresets[empId][String(dayIndex)];
+    if (!Object.keys(nextPresets[empId]).length) {
+        delete nextPresets[empId];
+    }
+
+    setShiftPresetsState(nextPresets);
+    hydratePresetsTableFromData(nextPresets);
+    syncPresetsToServer(nextPresets);
+}
+
+function openPresetCellEditor(empId, dayIndex) {
+    openPresetsModal();
+    window.setTimeout(function() {
+        const row = document.querySelector('#presetsTable tr[data-emp-id="' + empId + '"]');
+        if (!row) {
+            return;
+        }
+
+        const cell = row.querySelector('.preset-cell[data-day="' + String(dayIndex) + '"]');
+        if (!cell) {
+            return;
+        }
+
+        cell.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+        createPresetDropdown(cell);
+    }, 80);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setShiftPresetsState(getEffectivePresets());
+});
 </script>
 {% endblock %}
