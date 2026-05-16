@@ -71,15 +71,24 @@
                 </tbody>
             </table>
             </div>
-            <aside class="preset-sidebar no-print" aria-label="Saved shift presets">
+            <aside class="preset-sidebar no-print" aria-label="Saved shift preset classes">
                 <div class="preset-sidebar-header">
                     <div>
-                        <h3>Saved Presets</h3>
-                        <p>Persistent backup of weekly defaults for add, delete, and override.</p>
+                        <h3>Preset Classes</h3>
+                        <p>Group weekly defaults. Manage opens the grid; Add creates a new class.</p>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="openPresetsModal()">Manage</button>
                 </div>
                 <div id="presetSidebarContent" class="preset-sidebar-content"></div>
+                <div id="presetSidebarAddForm" class="preset-sidebar-add-form" hidden>
+                    <input type="text" id="sidebarNewClassName" placeholder="Class name (e.g. Weekend Crew)" maxlength="40">
+                    <input type="color" id="sidebarNewClassColor" value="#6b7280" title="Class color">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="sidebarCreatePresetClass()">Save</button>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="toggleSidebarAddForm(false)">Cancel</button>
+                </div>
+                <div class="preset-sidebar-footer">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="toggleSidebarAddForm(true)">+ Add Class</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="sidebarDeleteSelectedBtn" onclick="sidebarDeleteSelectedClasses()" disabled>Delete Selected</button>
+                </div>
             </aside>
         </div>
     </div>
@@ -228,6 +237,21 @@
         </div>
         <div class="modal-body">
             <p class="help-text">Set default shifts for employees that repeat every week. Click a cell to assign a preset shift, then <strong>Save Presets</strong>. Use <strong>Apply to Week</strong> to fill the current week from presets.</p>
+
+            <!-- Preset Classes management -->
+            <div class="preset-classes-strip" aria-label="Preset classes">
+                <div class="preset-classes-header">
+                    <strong>Preset Classes</strong>
+                    <span class="help-inline">Group entries in the Saved Presets sidebar. Assign a class to any cell via its dropdown.</span>
+                </div>
+                <div id="presetClassesList" class="preset-classes-list"></div>
+                <div class="preset-classes-add">
+                    <input type="text" id="newPresetClassName" placeholder="New class name (e.g. Weekend Crew)" maxlength="40">
+                    <input type="color" id="newPresetClassColor" value="#6b7280" title="Class color">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="createPresetClassFromForm()">+ Add Class</button>
+                </div>
+            </div>
+
             <div class="presets-table-container">
                 <table class="schedule-table presets-table" id="presetsTable">
                     <thead>
@@ -413,7 +437,79 @@
 .preset-sidebar-content {
     display: flex;
     flex-direction: column;
+    gap: 8px;
+}
+
+.preset-sidebar-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #dbe3ee;
+}
+
+.preset-sidebar-add-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border: 1px solid #dbe3ee;
+    border-radius: 8px;
+}
+.preset-sidebar-add-form input[type="text"] {
+    flex: 1 1 100%;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+.preset-sidebar-add-form input[type="color"] {
+    width: 32px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.preset-class-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
     gap: 10px;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+.preset-class-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+.preset-class-row .pc-row-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+}
+.preset-class-row .pc-row-text {
+    min-width: 0;
+}
+.preset-class-row .pc-row-name {
+    font-weight: 600;
+    color: #1f2937;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.preset-class-row .pc-row-count {
+    font-size: 0.76rem;
+    color: #64748b;
+    margin-top: 2px;
 }
 
 .preset-sidebar-empty {
@@ -692,6 +788,147 @@
     position: relative;
 }
 
+/* Preset Classes strip in the modal */
+.preset-classes-strip {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+.preset-classes-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.preset-classes-header .help-inline {
+    color: #6b7280;
+    font-size: 0.85em;
+}
+.preset-classes-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+    min-height: 28px;
+}
+.preset-classes-list:empty::before {
+    content: "No classes yet — add one below.";
+    color: #9ca3af;
+    font-style: italic;
+    font-size: 0.9em;
+}
+.preset-class-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.88em;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+.preset-class-chip .pcc-name {
+    cursor: text;
+    outline: none;
+}
+.preset-class-chip .pcc-name[contenteditable="true"]:focus {
+    background: rgba(255,255,255,0.5);
+    padding: 0 3px;
+    border-radius: 3px;
+}
+.preset-class-chip .pcc-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.05em;
+    line-height: 1;
+    padding: 0 2px;
+    color: inherit;
+    opacity: 0.7;
+}
+.preset-class-chip .pcc-delete:hover {
+    opacity: 1;
+}
+.preset-classes-add {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.preset-classes-add input[type="text"] {
+    flex: 1;
+    min-width: 180px;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.92em;
+}
+.preset-classes-add input[type="color"] {
+    width: 38px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Class color dot on a preset cell (top-right corner) */
+.preset-cell .preset-class-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+    pointer-events: none;
+}
+
+/* Class section inside the cell dropdown */
+.preset-dropdown .pd-class-section {
+    border-top: 1px solid #e5e7eb;
+    padding: 6px 4px 2px;
+    margin-top: 4px;
+}
+.preset-dropdown .pd-class-label {
+    font-size: 0.75em;
+    color: #6b7280;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 6px 4px;
+}
+.preset-dropdown .pd-class-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 4px 4px;
+}
+.preset-dropdown .pd-class-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.82em;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    cursor: pointer;
+}
+.preset-dropdown .pd-class-option.active {
+    box-shadow: inset 0 0 0 2px #111;
+}
+.pd-class-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+}
+
 .preset-cell {
     cursor: pointer;
     min-width: 80px;
@@ -946,6 +1183,149 @@ input[type="file"]:hover {
 const PRESET_STORAGE_KEY = 'keils_shift_presets_v1';
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 let shiftPresetsState = normalizePresets({{ saved_shift_presets | tojson }});
+let presetClassesState = []; // [{id, name, color}]
+
+function getPresetClass(classId) {
+    if (!classId) return null;
+    return presetClassesState.find(function(c) { return c.id === classId; }) || null;
+}
+
+function loadPresetClasses() {
+    return fetch('{{ url_for("get_preset_classes") }}')
+        .then(function(r) { return r.ok ? r.json() : []; })
+        .then(function(data) {
+            presetClassesState = Array.isArray(data) ? data : [];
+            renderPresetClassesStrip();
+            return presetClassesState;
+        })
+        .catch(function() { return presetClassesState; });
+}
+
+function renderPresetClassesStrip() {
+    const list = document.getElementById('presetClassesList');
+    if (!list) return;
+    list.innerHTML = presetClassesState.map(function(c) {
+        const safeName = (c.name || '').replace(/[<>&"]/g, function(ch) {
+            return { '<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;' }[ch];
+        });
+        return '<span class="preset-class-chip" data-class-id="' + c.id + '" '
+            + 'style="background:' + c.color + '20;color:' + c.color + ';border-color:' + c.color + ';">'
+            + '<span class="pd-class-swatch" style="background:' + c.color + ';"></span>'
+            + '<span class="pcc-name" contenteditable="true" '
+            + 'onblur="renamePresetClass(\'' + c.id + '\', this.textContent)" '
+            + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'
+            + safeName + '</span>'
+            + '<button type="button" class="pcc-delete" title="Delete class" '
+            + 'onclick="deletePresetClass(\'' + c.id + '\')">×</button>'
+            + '</span>';
+    }).join('');
+}
+
+function createPresetClassFromForm() {
+    const nameInput = document.getElementById('newPresetClassName');
+    const colorInput = document.getElementById('newPresetClassColor');
+    const name = (nameInput.value || '').trim();
+    const color = colorInput.value || '#6b7280';
+    if (!name) {
+        nameInput.focus();
+        return;
+    }
+    fetch('{{ url_for("create_preset_class") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, color: color })
+    }).then(function(r) {
+        return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+    }).then(function(res) {
+        if (!res.ok) {
+            alert(res.data.error || 'Could not create class');
+            return;
+        }
+        nameInput.value = '';
+        presetClassesState.push(res.data);
+        renderPresetClassesStrip();
+        refreshPresetsSidebar();
+    });
+}
+
+function renamePresetClass(classId, newName) {
+    const trimmed = (newName || '').trim();
+    const current = getPresetClass(classId);
+    if (!current || trimmed === current.name) return;
+    if (!trimmed) {
+        renderPresetClassesStrip();
+        return;
+    }
+    fetch('/schedule/preset-classes/' + encodeURIComponent(classId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+    }).then(function(r) {
+        return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+    }).then(function(res) {
+        if (!res.ok) {
+            alert(res.data.error || 'Could not rename class');
+            renderPresetClassesStrip();
+            return;
+        }
+        current.name = res.data.name;
+        renderPresetClassesStrip();
+        refreshPresetsSidebar();
+    });
+}
+
+function deletePresetClass(classId) {
+    const current = getPresetClass(classId);
+    if (!current) return;
+    if (!confirm('Delete the class "' + current.name + '"?\n\nPresets tagged with this class will become uncategorized.')) return;
+    fetch('/schedule/preset-classes/' + encodeURIComponent(classId) + '/delete', {
+        method: 'POST'
+    }).then(function(r) {
+        if (!r.ok) {
+            alert('Could not delete class');
+            return;
+        }
+        presetClassesState = presetClassesState.filter(function(c) { return c.id !== classId; });
+        // Clear class_id from any cached preset entries in state
+        Object.keys(shiftPresetsState).forEach(function(empId) {
+            Object.keys(shiftPresetsState[empId] || {}).forEach(function(day) {
+                const entry = shiftPresetsState[empId][day];
+                if (entry && entry.class_id === classId) {
+                    delete entry.class_id;
+                }
+            });
+        });
+        // Update DOM cells
+        document.querySelectorAll('#presetsTable .preset-cell[data-class-id="' + classId + '"]').forEach(function(cell) {
+            cell.removeAttribute('data-class-id');
+            const dot = cell.querySelector('.preset-class-dot');
+            if (dot) dot.remove();
+        });
+        renderPresetClassesStrip();
+        refreshPresetsSidebar();
+    });
+}
+
+function setCellClass(cell, classId) {
+    if (classId) {
+        cell.setAttribute('data-class-id', classId);
+    } else {
+        cell.removeAttribute('data-class-id');
+    }
+    let dot = cell.querySelector('.preset-class-dot');
+    const cls = getPresetClass(classId);
+    if (cls) {
+        if (!dot) {
+            dot = document.createElement('span');
+            dot.className = 'preset-class-dot';
+            cell.appendChild(dot);
+        }
+        dot.style.background = cls.color;
+        dot.title = cls.name;
+    } else if (dot) {
+        dot.remove();
+    }
+}
 
 function toggleScheduleMenu() {
     document.getElementById('scheduleDropdown').classList.toggle('open');
@@ -1187,53 +1567,159 @@ function getPresetChipClass(preset) {
     return PRESET_CHIP_CLASSES[preset.shift_type] || '';
 }
 
+function _empNameFor(empId) {
+    const row = document.querySelector('#presetsTable tr[data-emp-id="' + empId + '"]');
+    return row ? row.getAttribute('data-emp-name') : empId;
+}
+
+function _escapeHtml(s) {
+    return String(s || '').replace(/[<>&"]/g, function(ch) {
+        return { '<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;' }[ch];
+    });
+}
+
+function _countPresetsByClass() {
+    const counts = {};
+    presetClassesState.forEach(function(c) { counts[c.id] = 0; });
+    counts[''] = 0;
+    const presets = normalizePresets(shiftPresetsState);
+    Object.keys(presets).forEach(function(empId) {
+        Object.keys(presets[empId] || {}).forEach(function(day) {
+            const entry = presets[empId][day] || {};
+            const key = entry.class_id || '';
+            if (!counts.hasOwnProperty(key)) counts[key] = 0;
+            counts[key] += 1;
+        });
+    });
+    return counts;
+}
+
 function refreshPresetsSidebar() {
     const container = document.getElementById('presetSidebarContent');
     if (!container) {
         return;
     }
 
-    const presets = normalizePresets(shiftPresetsState);
-    const employeeIds = Object.keys(presets).sort(function(a, b) {
-        const rowA = document.querySelector('#presetsTable tr[data-emp-id="' + a + '"]');
-        const rowB = document.querySelector('#presetsTable tr[data-emp-id="' + b + '"]');
-        const nameA = rowA ? rowA.getAttribute('data-emp-name') : a;
-        const nameB = rowB ? rowB.getAttribute('data-emp-name') : b;
-        return nameA.localeCompare(nameB);
-    });
-
-    if (!employeeIds.length) {
-        container.innerHTML = '<div class="preset-sidebar-empty">No presets saved yet. Use Manage to add repeating shifts, then they will stay available here even after Render spins the app down.</div>';
+    if (!presetClassesState.length) {
+        container.innerHTML = '<div class="preset-sidebar-empty">No preset classes yet. Use <strong>+ Add Class</strong> below to create one (e.g. Weekend Crew, Trainees).</div>';
+        updateSidebarDeleteBtnState();
         return;
     }
 
-    container.innerHTML = employeeIds.map(function(empId) {
-        const row = document.querySelector('#presetsTable tr[data-emp-id="' + empId + '"]');
-        const empName = row ? row.getAttribute('data-emp-name') : empId;
-        const entries = Object.keys(presets[empId]).sort(function(a, b) {
-            return Number(a) - Number(b);
-        }).map(function(dayIndex) {
-            const preset = presets[empId][dayIndex];
-            const label = getPresetDisplayText(preset);
-            const chipClass = getPresetChipClass(preset);
-            const dayLabel = DAY_NAMES[Number(dayIndex)] || ('Day ' + dayIndex);
-            return '<li class="preset-sidebar-item">'
-                + '<div><div class="preset-sidebar-meta">'
-                + '<span class="preset-day">' + dayLabel + '</span>'
-                + '<span class="preset-chip ' + chipClass + '">' + label + '</span>'
-                + '</div></div>'
-                + '<div class="preset-sidebar-actions">'
-                + '<button type="button" class="preset-action-btn" onclick="openPresetCellEditor(\'' + empId + '\', ' + Number(dayIndex) + ')">Override</button>'
-                + '<button type="button" class="preset-action-btn delete" onclick="deletePresetEntry(\'' + empId + '\', ' + Number(dayIndex) + ')">Delete</button>'
-                + '</div>'
-                + '</li>';
-        }).join('');
+    const counts = _countPresetsByClass();
 
-        return '<section class="preset-sidebar-group">'
-            + '<div class="preset-sidebar-group-header"><div><strong>' + empName + '</strong><span class="preset-count">' + Object.keys(presets[empId]).length + ' preset(s)</span></div></div>'
-            + '<ul class="preset-sidebar-list">' + entries + '</ul>'
-            + '</section>';
+    container.innerHTML = presetClassesState.map(function(c) {
+        const count = counts[c.id] || 0;
+        return '<div class="preset-class-row" data-class-id="' + c.id + '">'
+            + '<input type="checkbox" class="pc-row-check" onchange="updateSidebarDeleteBtnState()">'
+            + '<span class="pc-row-swatch" style="background:' + c.color + ';"></span>'
+            + '<div class="pc-row-text">'
+            +   '<div class="pc-row-name">' + _escapeHtml(c.name) + '</div>'
+            +   '<div class="pc-row-count">' + count + ' preset(s)</div>'
+            + '</div>'
+            + '<button type="button" class="preset-action-btn" onclick="manageClassFromSidebar(\'' + c.id + '\')">Manage</button>'
+            + '</div>';
     }).join('');
+
+    updateSidebarDeleteBtnState();
+}
+
+function updateSidebarDeleteBtnState() {
+    const btn = document.getElementById('sidebarDeleteSelectedBtn');
+    if (!btn) return;
+    const anyChecked = document.querySelectorAll('#presetSidebarContent .pc-row-check:checked').length > 0;
+    btn.disabled = !anyChecked;
+}
+
+function manageClassFromSidebar(classId) {
+    // Open the presets modal and remember which class to focus on for any
+    // future class-scoped editing affordances.
+    window._activePresetClassId = classId;
+    openPresetsModal();
+}
+
+function toggleSidebarAddForm(show) {
+    const form = document.getElementById('presetSidebarAddForm');
+    if (!form) return;
+    form.hidden = !show;
+    if (show) {
+        const nameInput = document.getElementById('sidebarNewClassName');
+        if (nameInput) {
+            nameInput.value = '';
+            nameInput.focus();
+        }
+    }
+}
+
+function sidebarCreatePresetClass() {
+    const nameInput = document.getElementById('sidebarNewClassName');
+    const colorInput = document.getElementById('sidebarNewClassColor');
+    const name = (nameInput.value || '').trim();
+    const color = colorInput.value || '#6b7280';
+    if (!name) {
+        nameInput.focus();
+        return;
+    }
+    fetch('{{ url_for("create_preset_class") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, color: color })
+    }).then(function(r) {
+        return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+    }).then(function(res) {
+        if (!res.ok) {
+            alert(res.data.error || 'Could not create class');
+            return;
+        }
+        presetClassesState.push(res.data);
+        toggleSidebarAddForm(false);
+        renderPresetClassesStrip();
+        refreshPresetsSidebar();
+    });
+}
+
+function sidebarDeleteSelectedClasses() {
+    const checked = Array.from(document.querySelectorAll('#presetSidebarContent .pc-row-check:checked'));
+    if (!checked.length) return;
+    const targets = checked.map(function(cb) {
+        const row = cb.closest('.preset-class-row');
+        return row ? row.getAttribute('data-class-id') : null;
+    }).filter(Boolean);
+    if (!targets.length) return;
+
+    const names = targets.map(function(id) {
+        const c = getPresetClass(id);
+        return c ? c.name : id;
+    }).join(', ');
+    if (!confirm('Delete ' + targets.length + ' class(es)?\n\n' + names + '\n\nPresets tagged with these classes will become uncategorized.')) return;
+
+    Promise.all(targets.map(function(classId) {
+        return fetch('/schedule/preset-classes/' + encodeURIComponent(classId) + '/delete', {
+            method: 'POST'
+        });
+    })).then(function() {
+        // Refetch authoritative state from server in case orphaning rules change
+        return loadPresetClasses();
+    }).then(function() {
+        // Also clear class_id from cached presets locally so the table shows correctly
+        Object.keys(shiftPresetsState).forEach(function(empId) {
+            Object.keys(shiftPresetsState[empId] || {}).forEach(function(day) {
+                const entry = shiftPresetsState[empId][day];
+                if (entry && targets.indexOf(entry.class_id) !== -1) {
+                    delete entry.class_id;
+                }
+            });
+        });
+        document.querySelectorAll('#presetsTable .preset-cell').forEach(function(cell) {
+            const cid = cell.getAttribute('data-class-id');
+            if (cid && targets.indexOf(cid) !== -1) {
+                cell.removeAttribute('data-class-id');
+                const dot = cell.querySelector('.preset-class-dot');
+                if (dot) dot.remove();
+            }
+        });
+        refreshPresetsSidebar();
+    });
 }
 
 function hydratePresetsTableFromData(presets) {
@@ -1255,6 +1741,7 @@ function hydratePresetsTableFromData(presets) {
                 cell.removeAttribute('data-custom-text');
                 cell.querySelector('.preset-label').textContent = PRESET_LABELS[type] || '-';
             }
+            setCellClass(cell, preset.class_id || '');
         });
     });
 }
@@ -1316,6 +1803,52 @@ function createPresetDropdown(cell) {
         });
         dropdown.appendChild(editBtn);
     }
+
+    // Class selector (groups this preset into a Saved Presets sidebar bucket)
+    const classSection = document.createElement('div');
+    classSection.className = 'pd-class-section';
+    const classLabel = document.createElement('div');
+    classLabel.className = 'pd-class-label';
+    classLabel.textContent = 'Class';
+    classSection.appendChild(classLabel);
+
+    const classOptions = document.createElement('div');
+    classOptions.className = 'pd-class-options';
+    const currentClassId = cell.getAttribute('data-class-id') || '';
+
+    function makeClassOption(classObj) {
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        const isActive = classObj ? classObj.id === currentClassId : !currentClassId;
+        opt.className = 'pd-class-option' + (isActive ? ' active' : '');
+        if (classObj) {
+            opt.innerHTML = '<span class="pd-class-swatch" style="background:' + classObj.color + ';"></span>' + _escapeHtml(classObj.name);
+        } else {
+            opt.innerHTML = '<span class="pd-class-swatch" style="background:#e5e7eb;"></span>None';
+        }
+        opt.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            setCellClass(cell, classObj ? classObj.id : '');
+            closePresetDropdown();
+        });
+        return opt;
+    }
+
+    classOptions.appendChild(makeClassOption(null));
+    presetClassesState.forEach(function(c) {
+        classOptions.appendChild(makeClassOption(c));
+    });
+
+    classSection.appendChild(classOptions);
+
+    if (!presetClassesState.length) {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:0.78em;color:#9ca3af;padding:0 6px 4px;';
+        hint.textContent = 'No classes yet — add one in the Preset Classes section above.';
+        classSection.appendChild(hint);
+    }
+
+    dropdown.appendChild(classSection);
 
     cell.appendChild(dropdown);
     activeDropdown = dropdown;
@@ -1460,7 +1993,9 @@ function highlightPresetToday() {
 
 function openPresetsModal() {
     document.getElementById('presetsModal').classList.add('active');
-    loadPresets();
+    loadPresetClasses().then(function() {
+        loadPresets();
+    });
     highlightPresetToday();
     attachPresetCellEvents();
 }
@@ -1481,6 +2016,7 @@ function clearAllPresets() {
             cell.setAttribute('data-type', '');
             cell.removeAttribute('data-custom-text');
             cell.querySelector('.preset-label').textContent = '-';
+            setCellClass(cell, '');
         });
     });
     setShiftPresetsState({});
@@ -1512,6 +2048,10 @@ function gatherPresetsData() {
                 const entry = { shift_type: type, station: '' };
                 if (type === 'custom') {
                     entry.custom_text = cell.getAttribute('data-custom-text') || '';
+                }
+                const classId = cell.getAttribute('data-class-id') || '';
+                if (classId) {
+                    entry.class_id = classId;
                 }
                 empPresets[day] = entry;
                 hasAny = true;
@@ -1585,6 +2125,8 @@ function openPresetCellEditor(empId, dayIndex) {
 
 document.addEventListener('DOMContentLoaded', function() {
     setShiftPresetsState(getEffectivePresets());
+    // Load classes so the sidebar shows class-grouped names on first paint
+    loadPresetClasses().then(refreshPresetsSidebar);
 });
 </script>
 {% endblock %}

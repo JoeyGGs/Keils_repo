@@ -99,17 +99,6 @@
     "availability": {}
   },
   {
-    "id": "EMP010",
-    "name": "Joey",
-    "phone": "",
-    "email": "",
-    "position": "Deli Associate",
-    "hire_date": "2025-12-21",
-    "hourly_rate": 15.0,
-    "max_hours_per_week": 40,
-    "availability": {}
-  },
-  {
     "id": "EMP012",
     "name": "Richard",
     "phone": "",
@@ -127,6 +116,17 @@
     "email": "",
     "position": "Deli Associate",
     "hire_date": "2025-12-21",
+    "hourly_rate": 15.0,
+    "max_hours_per_week": 40,
+    "availability": {}
+  },
+  {
+    "id": "EMP20260516084610",
+    "name": "Rowan",
+    "phone": "",
+    "email": "",
+    "position": "Deli Associate",
+    "hire_date": "2026-05-16",
     "hourly_rate": 15.0,
     "max_hours_per_week": 40,
     "availability": {}

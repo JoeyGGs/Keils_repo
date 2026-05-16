@@ -46,6 +46,7 @@ class InvoiceLineItem:
     sku: str = ""
     matched_inventory_id: str = ""  # Matched to an existing inventory item
     matched_inventory_name: str = ""
+    matched_vendor_product_id: str = ""  # Matched to a VendorProduct (drives catalog cost backfill)
 
 
 @dataclass
@@ -338,6 +339,7 @@ class InvoiceManager:
                         'sku': i.sku,
                         'matched_inventory_id': i.matched_inventory_id,
                         'matched_inventory_name': i.matched_inventory_name,
+                        'matched_vendor_product_id': i.matched_vendor_product_id,
                     }
                     for i in inv.line_items
                 ],

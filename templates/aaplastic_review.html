@@ -16,17 +16,6 @@
 </div>
 {% endif %}
 
-{% if screenshot_url %}
-<div class="card" style="margin-bottom: 20px;">
-    <div class="card-header"><strong>📸 Screenshot of Filled Order</strong></div>
-    <div class="card-body" style="padding: 0; text-align: center;">
-        <img src="{{ screenshot_url }}" alt="AA Plastics order screenshot"
-             style="width: 100%; max-width: 100%; border-radius: 0 0 8px 8px; cursor: zoom-in;"
-             onclick="this.style.maxWidth = this.style.maxWidth === 'none' ? '100%' : 'none'">
-    </div>
-</div>
-{% endif %}
-
 <div class="card" style="margin-bottom: 20px;">
     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <strong>📋 Items Filled: {{ filled }} of {{ filled + missed }}</strong>
@@ -37,7 +26,17 @@
         {% endif %}
     </div>
     <div class="card-body">
-        {% if order %}
+        {% if has_unpriced %}
+        <div style="margin-bottom: 14px; padding: 12px; background: #3a2e1a; border-radius: 6px; border: 1px solid #6a5520;">
+            <strong style="color: #ffcc66;">⚠️ Some items have no known price.</strong>
+            <p style="color: #ddc18a; margin: 6px 0 0 0; font-size: 0.92em;">
+                AA Plastics doesn't show prices on their site, so we backfill costs from invoices.
+                Items with $0.00 below haven't appeared on a processed invoice yet — the grand total
+                is a lower bound, not the final charge.
+            </p>
+        </div>
+        {% endif %}
+        {% if review_items %}
         <div style="overflow-x: auto;">
             <table class="table" style="width: 100%;">
                 <thead>
@@ -45,17 +44,24 @@
                         <th>Product</th>
                         <th>SKU</th>
                         <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Unit Cost</th>
+                        <th style="text-align: right;">Line Total</th>
                         <th style="text-align: right;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.items %}
+                    {% for item in review_items %}
                     <tr>
-                        <td>{{ item.product_name }}</td>
+                        <td>{{ item.name }}</td>
                         <td style="color: #888;">{{ item.sku or '—' }}</td>
                         <td style="text-align: center; font-weight: bold;">{{ item.quantity }}</td>
+                        <td style="text-align: right; {% if not item.priced %}color: #ffcc66;{% endif %}">
+                            ${{ '%.2f'|format(item.unit_cost) }}
+                            {% if not item.priced %}<span title="No invoice has set this price yet" style="font-size: 0.85em;">⚠</span>{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: bold;">${{ '%.2f'|format(item.line_total) }}</td>
                         <td style="text-align: right;">
-                            {% if item.product_name in missed_items %}
+                            {% if item.missed %}
                             <span style="color: #ff8888;">❌ Not found</span>
                             {% else %}
                             <span style="color: #66cc66;">✅ Filled</span>
@@ -64,6 +70,17 @@
                     </tr>
                     {% endfor %}
                 </tbody>
+                <tfoot>
+                    <tr style="border-top: 2px solid #555;">
+                        <td colspan="4" style="text-align: right; font-weight: bold; padding-top: 10px;">
+                            Estimated Total{% if has_unpriced %} (partial){% endif %}:
+                        </td>
+                        <td style="text-align: right; font-weight: bold; font-size: 1.15em; padding-top: 10px;">
+                            ${{ '%.2f'|format(grand_total) }}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
         {% endif %}

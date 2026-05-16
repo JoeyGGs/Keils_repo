@@ -85,6 +85,101 @@
     {% endif %}
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    <!-- Submission notification: chime + toast triggered by ?aaplastic_submitted=1 -->
+    <div id="orderSubmittedToast" class="order-submitted-toast" hidden>
+        <span class="ost-icon">✅</span>
+        <span class="ost-text">Order submitted to AA Plastics</span>
+        <button type="button" class="ost-close" onclick="document.getElementById('orderSubmittedToast').hidden=true">×</button>
+    </div>
+    <style>
+        .order-submitted-toast[hidden] { display: none !important; }
+        .order-submitted-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #065f46;
+            color: white;
+            padding: 14px 18px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            z-index: 9999;
+            animation: ostSlideIn 0.35s ease-out;
+        }
+        .order-submitted-toast .ost-icon { font-size: 1.4em; }
+        .order-submitted-toast .ost-close {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.3em;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 2px;
+        }
+        @keyframes ostSlideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+    <script>
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('aaplastic_submitted') !== '1') return;
+
+            // Show the toast
+            const toast = document.getElementById('orderSubmittedToast');
+            if (toast) {
+                toast.hidden = false;
+                setTimeout(function() { toast.hidden = true; }, 8000);
+            }
+
+            // Play a two-note chime
+            try {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                const ctx = new AC();
+                const playTone = function(freq, when, dur) {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    const t0 = ctx.currentTime + when;
+                    gain.gain.setValueAtTime(0, t0);
+                    gain.gain.linearRampToValueAtTime(0.25, t0 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+                    osc.start(t0);
+                    osc.stop(t0 + dur + 0.05);
+                };
+                const start = function() {
+                    playTone(880, 0, 0.18);     // A5
+                    playTone(1318.5, 0.15, 0.28); // E6
+                };
+                if (ctx.state === 'suspended') {
+                    ctx.resume().then(start).catch(function() {
+                        // Autoplay blocked — sound will fail silently. The toast still shows.
+                    });
+                } else {
+                    start();
+                }
+            } catch (e) {
+                console.warn('Order chime failed:', e);
+            }
+
+            // Clean the URL so refresh doesn't replay
+            if (window.history && window.history.replaceState) {
+                params.delete('aaplastic_submitted');
+                const qs = params.toString();
+                window.history.replaceState({}, document.title,
+                    window.location.pathname + (qs ? ('?' + qs) : '') + window.location.hash);
+            }
+        })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

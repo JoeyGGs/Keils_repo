@@ -243,18 +243,21 @@
     <!-- Action Buttons -->
     <div class="invoice-actions" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px;">
         {% if not invoice.signed %}
-        <form method="POST" action="{{ url_for('sign_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Sign this invoice? It will move to the Settled folder.')">
-            <button type="submit" class="btn btn-primary btn-lg">✍️ Sign &amp; Settle</button>
+        <form method="POST" action="{{ url_for('sign_invoice', invoice_id=invoice.id) }}"
+              onsubmit="return confirm('Sign this invoice?\n\nIt will move to Settled and {{ invoice.matched_count }} matched price(s) will be applied to inventory and the vendor catalog.')">
+            <button type="submit" class="btn btn-primary btn-lg">✍️ Sign, Settle &amp; Apply Prices</button>
         </form>
+        <span style="color: var(--text-secondary, #888); font-size: 0.88em; align-self: center;">
+            Prices update only on signed invoices.
+        </span>
         {% else %}
         <form method="POST" action="{{ url_for('unsign_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Remove signature? Invoice will move back to Receiving.')">
             <button type="submit" class="btn btn-outline">↩ Move Back to Receiving</button>
         </form>
-        {% endif %}
-        {% if invoice.status != 'applied' %}
-        <form method="POST" action="{{ url_for('apply_invoice', invoice_id=invoice.id) }}" onsubmit="return confirm('Apply prices from this invoice to your inventory? This will update unit prices for all matched items.')">
-            <button type="submit" class="btn btn-primary" {% if invoice.matched_count == 0 %}disabled title="Match at least one item first"{% endif %}>
-                ✓ Apply {{ invoice.matched_count }} Price Updates to Inventory
+        <form method="POST" action="{{ url_for('apply_invoice', invoice_id=invoice.id) }}"
+              onsubmit="return confirm('Re-apply prices from this invoice? Use this if line items were edited after signing.')">
+            <button type="submit" class="btn btn-outline" {% if invoice.matched_count == 0 %}disabled title="Match at least one item first"{% endif %}>
+                🔄 Re-apply Prices
             </button>
         </form>
         {% endif %}

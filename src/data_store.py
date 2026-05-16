@@ -31,6 +31,7 @@ class DataStore:
         self.inventory_counts_file = self.data_dir / "inventory_counts.json"
         self.shift_presets_file = self.data_dir / "shift_presets.json"
         self.shift_definitions_file = self.data_dir / "shift_definitions.json"
+        self.preset_classes_file = self.data_dir / "preset_classes.json"
     
     # ========== Employee Operations ==========
     
@@ -320,6 +321,23 @@ class DataStore:
         data = self._read_json(self.shift_definitions_file)
         if not data or isinstance(data, list):
             return dict(self.DEFAULT_SHIFT_DEFINITIONS)
+        return data
+
+    # ========== Preset Classes Operations ==========
+    # A "preset class" is a user-defined group label that an employee/day preset
+    # cell can be tagged with (e.g. "Standard Team", "Weekend Crew", "Trainees").
+    # The Saved Presets sidebar groups entries by class so the operator can scan
+    # crews together instead of by employee.
+
+    def save_preset_classes(self, classes: list):
+        """Persist preset class definitions: [{id, name, color}]"""
+        self._write_json(self.preset_classes_file, classes)
+
+    def load_preset_classes(self) -> list:
+        """Load preset class definitions."""
+        data = self._read_json(self.preset_classes_file)
+        if isinstance(data, dict) or not data:
+            return []
         return data
 
     # ========== Helper Methods ==========

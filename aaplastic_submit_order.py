@@ -229,13 +229,12 @@ def submit_order():
 # Headless mode: called from the web app on Render
 # ---------------------------------------------------------------------------
 
-def submit_order_headless(order_id, screenshot_dir=None):
+def submit_order_headless(order_id):
     """Run order fill headlessly. Returns dict with driver kept alive for approve.
 
     Returns:
         {
             'driver': WebDriver | None,
-            'screenshot': str | None,   # file path
             'filled': int,
             'missed': int,
             'missed_items': list[str],
@@ -244,7 +243,7 @@ def submit_order_headless(order_id, screenshot_dir=None):
         }
     """
     result = {
-        'driver': None, 'screenshot': None, 'filled': 0,
+        'driver': None, 'filled': 0,
         'missed': 0, 'missed_items': [], 'order': None, 'error': None,
     }
 
@@ -279,7 +278,6 @@ def submit_order_headless(order_id, screenshot_dir=None):
     try:
         success = do_login(driver)
         if not success:
-            _save_screenshot(driver, screenshot_dir, order_id, '_error', result)
             result['error'] = 'Login to AA Plastics failed — check credentials'
             return result
 
@@ -300,28 +298,11 @@ def submit_order_headless(order_id, screenshot_dir=None):
         result['filled'] = filled
         result['missed'] = missed
         result['missed_items'] = missed_items
-
-        # Take a review screenshot
-        _save_screenshot(driver, screenshot_dir, order_id, '_review', result)
         return result
 
     except Exception as e:
-        _save_screenshot(driver, screenshot_dir, order_id, '_error', result)
         result['error'] = str(e)
         return result
-
-
-def _save_screenshot(driver, screenshot_dir, order_id, suffix, result):
-    """Helper: save a screenshot into result['screenshot']."""
-    if not screenshot_dir:
-        return
-    try:
-        os.makedirs(screenshot_dir, exist_ok=True)
-        path = os.path.join(screenshot_dir, f'{order_id}{suffix}.png')
-        driver.save_screenshot(path)
-        result['screenshot'] = path
-    except Exception:
-        pass
 
 
 def click_submit_order(driver):

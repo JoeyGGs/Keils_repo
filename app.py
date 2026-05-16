@@ -37,10 +37,8 @@ invoice_parser = InvoiceOCRParser()
 # ---------------------------------------------------------------------------
 # AA Plastics headless job store  (in-memory, single-worker gunicorn is fine)
 # ---------------------------------------------------------------------------
-_aaplastic_jobs = {}   # {job_id: {status, order_id, driver, screenshot, ...}}
+_aaplastic_jobs = {}   # {job_id: {status, order_id, driver, ...}}
 
-_SCREENSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                'static', 'screenshots')
 _APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'America/Los_Angeles')
 
 
@@ -61,11 +59,10 @@ def _run_aaplastic_job(job_id, order_id):
     """Background thread: headless Selenium fills order on AA Plastics."""
     try:
         from aaplastic_submit_order import submit_order_headless
-        result = submit_order_headless(order_id, screenshot_dir=_SCREENSHOTS_DIR)
+        result = submit_order_headless(order_id)
         _aaplastic_jobs[job_id].update({
             'status': 'error' if result.get('error') else 'ready',
             'driver': result.get('driver'),
-            'screenshot': result.get('screenshot'),
             'filled': result.get('filled', 0),
             'missed': result.get('missed', 0),
             'missed_items': result.get('missed_items', []),
@@ -76,18 +73,13 @@ def _run_aaplastic_job(job_id, order_id):
 
 
 def _cleanup_aaplastic_job(job_id):
-    """Quit browser & delete screenshot for a finished job."""
+    """Quit browser for a finished job."""
     job = _aaplastic_jobs.pop(job_id, None)
     if not job:
         return
     if job.get('driver'):
         try:
             job['driver'].quit()
-        except Exception:
-            pass
-    if job.get('screenshot'):
-        try:
-            os.remove(job['screenshot'])
         except Exception:
             pass
 
@@ -544,6 +536,87 @@ def save_shift_presets():
     if presets_data is None:
         return jsonify({'error': 'Invalid data'}), 400
     data_store.save_shift_presets(presets_data)
+    return jsonify({'success': True})
+
+
+# ---- Preset Classes (user-defined groups for the saved-presets sidebar) ----
+
+@app.route('/schedule/preset-classes', methods=['GET'])
+@login_required
+def get_preset_classes():
+    """Return all user-defined preset classes."""
+    return jsonify(data_store.load_preset_classes())
+
+
+@app.route('/schedule/preset-classes', methods=['POST'])
+@login_required
+def create_preset_class():
+    """Create a new preset class. Body: {name, color}"""
+    body = request.get_json() or {}
+    name = (body.get('name') or '').strip()
+    color = (body.get('color') or '#6b7280').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+
+    classes = data_store.load_preset_classes()
+    if any(c.get('name', '').lower() == name.lower() for c in classes):
+        return jsonify({'error': 'A class with that name already exists'}), 400
+
+    new_class = {'id': _uuid.uuid4().hex[:8].upper(), 'name': name, 'color': color}
+    classes.append(new_class)
+    data_store.save_preset_classes(classes)
+    return jsonify(new_class)
+
+
+@app.route('/schedule/preset-classes/<class_id>', methods=['POST'])
+@login_required
+def update_preset_class(class_id):
+    """Rename / recolor a preset class. Body: {name?, color?}"""
+    body = request.get_json() or {}
+    classes = data_store.load_preset_classes()
+    target = next((c for c in classes if c.get('id') == class_id), None)
+    if not target:
+        return jsonify({'error': 'Class not found'}), 404
+
+    if 'name' in body:
+        new_name = (body.get('name') or '').strip()
+        if not new_name:
+            return jsonify({'error': 'Name cannot be empty'}), 400
+        # Prevent collision with another class
+        if any(c.get('id') != class_id and c.get('name', '').lower() == new_name.lower()
+               for c in classes):
+            return jsonify({'error': 'A class with that name already exists'}), 400
+        target['name'] = new_name
+    if 'color' in body and body.get('color'):
+        target['color'] = body['color']
+
+    data_store.save_preset_classes(classes)
+    return jsonify(target)
+
+
+@app.route('/schedule/preset-classes/<class_id>/delete', methods=['POST'])
+@login_required
+def delete_preset_class(class_id):
+    """Delete a preset class. Any presets tagged with this class become
+    uncategorized (the cell data stays, the class_id is cleared)."""
+    classes = data_store.load_preset_classes()
+    classes = [c for c in classes if c.get('id') != class_id]
+    data_store.save_preset_classes(classes)
+
+    # Orphan any cells that referenced this class
+    presets = data_store.load_shift_presets()
+    if isinstance(presets, dict):
+        changed = False
+        for emp_id, days in presets.items():
+            if not isinstance(days, dict):
+                continue
+            for day_key, entry in days.items():
+                if isinstance(entry, dict) and entry.get('class_id') == class_id:
+                    entry.pop('class_id', None)
+                    changed = True
+        if changed:
+            data_store.save_shift_presets(presets)
+
     return jsonify({'success': True})
 
 
@@ -1375,6 +1448,8 @@ def _match_invoice_to_order(invoice):
 
         if best_match:
             matched_order_names.add(best_key)
+            # Record the vendor product link so apply_invoice can backfill catalog cost
+            li.matched_vendor_product_id = best_match.product_id
             # Check quantity
             ordered_qty = best_match.quantity
             received_qty = li.quantity
@@ -1671,36 +1746,41 @@ def edit_invoice_item(invoice_id):
     return redirect(url_for('review_invoice', invoice_id=invoice_id))
 
 
-@app.route('/invoices/<invoice_id>/apply', methods=['POST'])
-@login_required
-def apply_invoice(invoice_id):
-    """Apply invoice prices to inventory items"""
-    invoice = invoice_manager.get_invoice(invoice_id)
-    if not invoice:
-        flash('Invoice not found', 'error')
-        return redirect(url_for('invoices_page'))
-    
+def _apply_invoice_prices(invoice):
+    """Push invoice prices into inventory and the vendor catalog.
+
+    Only runs on settled (signed) invoices — receiving invoices are for
+    missing-item detection only, not price updates. Mutates `invoice` in place
+    (sets status='applied' and populates applied_updates) and persists changes.
+
+    Returns the list of updates applied (one entry per inventory or vendor
+    product whose cost actually changed).
+    """
+    if not invoice.signed:
+        return []
+
     inventory_items = data_store.load_inventory()
     items_by_id = {item.id: item for item in inventory_items}
-    
+
     updates_applied = []
-    
+
     for line_item in invoice.line_items:
         if not line_item.matched_inventory_id:
             continue
-        
+
         inv_item = items_by_id.get(line_item.matched_inventory_id)
         if not inv_item:
             continue
-        
+
         old_price = inv_item.cost_per_unit
         new_price = line_item.unit_price
-        
+
         if new_price > 0 and new_price != old_price:
             inv_item.cost_per_unit = new_price
             inv_item.last_updated = datetime.now()
-            
+
             updates_applied.append({
+                'target': 'inventory',
                 'item_name': inv_item.name,
                 'item_id': inv_item.id,
                 'old_price': old_price,
@@ -1708,16 +1788,63 @@ def apply_invoice(invoice_id):
                 'change': round(new_price - old_price, 2),
                 'change_pct': round(((new_price - old_price) / old_price * 100) if old_price > 0 else 0, 1),
             })
-    
-    # Save updated inventory
+
     data_store.save_inventory(inventory_items)
-    
-    # Mark invoice as applied
+
+    # Backfill vendor catalog costs so the pre-submit order review can show
+    # accurate totals (AA Plastics does not surface prices on their site, so
+    # the settled invoice is the only source of truth).
+    for line_item in invoice.line_items:
+        if not line_item.matched_vendor_product_id:
+            continue
+
+        new_price = line_item.unit_price
+        if new_price <= 0:
+            continue
+
+        product = vendor_order_manager.get_product(line_item.matched_vendor_product_id)
+        if not product:
+            continue
+
+        old_price = product.cost
+        if new_price == old_price:
+            continue
+
+        vendor_order_manager.update_product(product.id, cost=new_price)
+
+        updates_applied.append({
+            'target': 'vendor_product',
+            'item_name': product.name,
+            'item_id': product.id,
+            'old_price': old_price,
+            'new_price': new_price,
+            'change': round(new_price - old_price, 2),
+            'change_pct': round(((new_price - old_price) / old_price * 100) if old_price > 0 else 0, 1),
+        })
+
     invoice.status = 'applied'
     invoice.applied_updates = updates_applied
     invoice_manager.update_invoice(invoice)
-    
-    flash(f'Invoice applied: {len(updates_applied)} prices updated', 'success')
+    return updates_applied
+
+
+@app.route('/invoices/<invoice_id>/apply', methods=['POST'])
+@login_required
+def apply_invoice(invoice_id):
+    """Manually re-apply invoice prices. Only valid for settled (signed)
+    invoices — signing normally auto-applies, this route exists for re-apply
+    after edits."""
+    invoice = invoice_manager.get_invoice(invoice_id)
+    if not invoice:
+        flash('Invoice not found', 'error')
+        return redirect(url_for('invoices_page'))
+
+    if not invoice.signed:
+        flash('Sign the invoice first — only settled invoices update prices.', 'error')
+        return redirect(url_for('review_invoice', invoice_id=invoice_id))
+
+    updates_applied = _apply_invoice_prices(invoice)
+    flash(f'Invoice re-applied: {len(updates_applied)} prices updated', 'success')
     return redirect(url_for('review_invoice', invoice_id=invoice_id))
 
 
@@ -1733,14 +1860,26 @@ def delete_invoice(invoice_id):
 @app.route('/invoices/<invoice_id>/sign', methods=['POST'])
 @login_required
 def sign_invoice(invoice_id):
-    """Mark an invoice as signed (moves to settled)"""
+    """Mark an invoice as signed (moves to settled) and auto-apply prices.
+
+    Signing is the commit point: it means the delivery is finalized, so this
+    is when invoice prices flow into inventory cost_per_unit and into the
+    vendor catalog cost (used by the AA Plastics pre-submit review).
+    """
     invoice = invoice_manager.get_invoice(invoice_id)
     if not invoice:
         flash('Invoice not found', 'error')
         return redirect(url_for('invoices_page'))
+
     invoice.signed = True
     invoice_manager.update_invoice(invoice)
-    flash('Invoice signed and moved to Settled.', 'success')
+
+    updates_applied = _apply_invoice_prices(invoice)
+    if updates_applied:
+        flash(f'Invoice signed and settled — {len(updates_applied)} prices updated.', 'success')
+    else:
+        flash('Invoice signed and moved to Settled. No price changes to apply.', 'success')
+
     return redirect(url_for('review_invoice', invoice_id=invoice_id))
 
 
@@ -1972,16 +2111,11 @@ def aaplastic_job_status(job_id):
 @app.route('/ordering/aaplastic-review/<job_id>')
 @login_required
 def aaplastic_review(job_id):
-    """Review page: screenshot of filled order + approve / cancel."""
+    """Review page: backfilled price table + approve / cancel."""
     job = _aaplastic_jobs.get(job_id)
     if not job:
         flash('Job not found or expired.', 'error')
         return redirect(url_for('ordering', vendor='V005'))
-
-    screenshot_url = None
-    if job.get('screenshot'):
-        filename = os.path.basename(job['screenshot'])
-        screenshot_url = url_for('static', filename=f'screenshots/{filename}')
 
     # Load order details for the item table
     order = None
@@ -1992,13 +2126,40 @@ def aaplastic_review(job_id):
     except Exception:
         pass
 
+    # Build per-line review data using the freshest VendorProduct.cost
+    # (invoice-driven backfill writes the latest invoiced price into the catalog,
+    # so this is the best estimate of what AA Plastics will actually charge).
+    review_items = []
+    grand_total = 0.0
+    has_unpriced = False
+    if order:
+        for it in order.items:
+            product = vendor_order_manager.get_product(it.product_id)
+            unit_cost = product.cost if product else it.cost
+            line_total = round(unit_cost * it.quantity, 2)
+            grand_total += line_total
+            if unit_cost <= 0:
+                has_unpriced = True
+            review_items.append({
+                'name': it.product_name,
+                'sku': it.sku,
+                'quantity': it.quantity,
+                'unit_cost': unit_cost,
+                'line_total': line_total,
+                'priced': unit_cost > 0,
+                'missed': it.product_name in job.get('missed_items', []),
+            })
+    grand_total = round(grand_total, 2)
+
     return render_template('aaplastic_review.html',
                            job_id=job_id,
                            order=order,
+                           review_items=review_items,
+                           grand_total=grand_total,
+                           has_unpriced=has_unpriced,
                            filled=job.get('filled', 0),
                            missed=job.get('missed', 0),
                            missed_items=job.get('missed_items', []),
-                           screenshot_url=screenshot_url,
                            error=job.get('error'))
 
 
@@ -2012,10 +2173,11 @@ def aaplastic_approve(job_id):
         _cleanup_aaplastic_job(job_id)
         return redirect(url_for('ordering', vendor='V005'))
 
+    submitted = False
     try:
         from aaplastic_submit_order import click_submit_order
-        success = click_submit_order(job['driver'])
-        if success:
+        submitted = click_submit_order(job['driver'])
+        if submitted:
             flash('Order submitted on AA Plastics!', 'success')
         else:
             flash('Could not find the submit button. Log in to AA Plastics and submit manually.', 'warning')
@@ -2024,6 +2186,8 @@ def aaplastic_approve(job_id):
     finally:
         _cleanup_aaplastic_job(job_id)
 
+    if submitted:
+        return redirect(url_for('ordering', vendor='V005', aaplastic_submitted=1))
     return redirect(url_for('ordering', vendor='V005'))
 
 
